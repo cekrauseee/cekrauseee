@@ -154,7 +154,7 @@ export function BlockCursorInput({
         disabled={disabled}
         aria-invalid={invalid || undefined}
         aria-errormessage={errorMessageId}
-        aria-keyshortcuts="ArrowUp ArrowDown Control+L Meta+L"
+        aria-keyshortcuts="ArrowUp ArrowDown Shift+PageUp Shift+PageDown Control+L Meta+L"
         onChange={(event) => {
           onChange(event.currentTarget.value);
           setCaretIndex(getCaretIndex(event.currentTarget));

@@ -40,6 +40,7 @@ body {
   min-width: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -81,14 +82,17 @@ textarea {
   height: 100vh;
   height: 100dvh;
   width: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  padding-block: max(1.25rem, env(safe-area-inset-top))
-    max(1.5rem, env(safe-area-inset-bottom));
+  overflow: hidden;
+  overscroll-behavior: none;
   padding-inline: max(1rem, env(safe-area-inset-left))
     max(1rem, env(safe-area-inset-right));
+  touch-action: pan-x pinch-zoom;
+}
+
+.shell__track {
+  min-height: 100%;
+  padding-block: max(1.25rem, env(safe-area-inset-top))
+    max(1.5rem, env(safe-area-inset-bottom));
 }
 
 .shell__inner {
@@ -146,6 +150,19 @@ textarea {
 
 .response > :last-child {
   margin-block-end: 0;
+}
+
+.response p:empty,
+.response h1:empty,
+.response h2:empty,
+.response h3:empty,
+.response h4:empty,
+.response blockquote:empty,
+.response pre:empty,
+.response li:empty,
+.response ul:not(:has(li:not(:empty))),
+.response ol:not(:has(li:not(:empty))) {
+  display: none;
 }
 
 .response p,
@@ -248,18 +265,6 @@ textarea {
   background: var(--surface-raised);
 }
 
-.word-reveal {
-  opacity: 0;
-  animation: word-in 80ms ease-out forwards;
-  animation-delay: var(--word-delay);
-}
-
-@keyframes word-in {
-  to {
-    opacity: 1;
-  }
-}
-
 .composer {
   margin-block-start: 1.5rem;
 }
@@ -349,26 +354,40 @@ textarea {
 }
 
 .pending {
-  margin: 0.55rem 0 0;
+  display: flex;
+  align-items: center;
+  min-height: 1.6em;
+  margin: 0;
   color: var(--text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  font-size: inherit;
+  line-height: inherit;
 }
 
-.pending::after {
-  content: "";
-  display: inline-block;
-  width: 0.65ch;
-  height: 1em;
-  margin-inline-start: 0.4ch;
-  background: currentColor;
-  vertical-align: -0.12em;
-  animation: pending-caret 900ms step-end infinite;
+.pending__shimmer {
+  display: inline-flex;
 }
 
-@keyframes pending-caret {
-  50% {
-    opacity: 0;
+.pending__shimmer-character {
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pending__shimmer-character {
+    animation: terminal-shimmer 1120ms steps(1, end) infinite;
+  }
+}
+
+@keyframes terminal-shimmer {
+  0%,
+  16%,
+  34%,
+  100% {
+    color: var(--text-muted);
+  }
+
+  17%,
+  33% {
+    color: var(--text);
   }
 }
 
@@ -380,15 +399,6 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .word-reveal {
-    opacity: 1;
-    animation: none;
-  }
-
-  .pending::after {
-    animation: none;
-  }
-
   .block-cursor {
     opacity: 1;
     animation: none;
@@ -397,9 +407,12 @@ textarea {
 
 @media (min-width: 48rem) {
   .shell {
-    padding-block-start: max(2.5rem, env(safe-area-inset-top));
     padding-inline: max(2.5rem, env(safe-area-inset-left))
       max(2.5rem, env(safe-area-inset-right));
+  }
+
+  .shell__track {
+    padding-block-start: max(2.5rem, env(safe-area-inset-top));
   }
 }
 

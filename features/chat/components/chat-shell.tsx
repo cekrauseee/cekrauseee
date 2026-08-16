@@ -12,20 +12,25 @@ import {
 import { sendMessage } from "../actions";
 import type { ChatMessage } from "../types";
 import { usePromptHistory } from "../hooks/use-prompt-history";
+import { useTerminalScroll } from "../hooks/use-terminal-scroll";
 import { BlockCursorInput } from "./block-cursor-input";
 import { MarkdownResponse } from "./markdown-response";
 import { PromptPrefix } from "./prompt-prefix";
+
+const THINKING_LABEL = "Thinking";
 
 export function ChatShell() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [prompt, setPrompt] = useState("");
   const [pending, setPending] = useState(false);
+  const [renderingResponse, setRenderingResponse] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   const requestEpoch = useRef(0);
   const { next, previous, record, resetCursor } = usePromptHistory();
+  const { lineOffset, scrollToEnd, trackRef, viewportRef } =
+    useTerminalScroll();
 
   const focusPromptAtEnd = useCallback(() => {
     const textarea = textareaRef.current;
@@ -40,11 +45,17 @@ export function ChatShell() {
     setMessages([]);
     setPrompt("");
     setPending(false);
+    setRenderingResponse(false);
     setError(null);
     setAnnouncement("Conversation cleared.");
     resetCursor();
     requestAnimationFrame(focusPromptAtEnd);
   }, [focusPromptAtEnd, resetCursor]);
+
+  const finishResponseRendering = useCallback(() => {
+    setRenderingResponse(false);
+    requestAnimationFrame(focusPromptAtEnd);
+  }, [focusPromptAtEnd]);
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -59,24 +70,25 @@ export function ChatShell() {
   }, [clearShell]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [messages, pending, error]);
+    scrollToEnd();
+  }, [error, messages, pending, scrollToEnd]);
 
   const submitPrompt = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const content = prompt.trim();
-    if (!content || pending) return;
+    if (!content || pending || renderingResponse) return;
 
     const userMessage: ChatMessage = { role: "user", content };
     const nextMessages = [...messages, userMessage];
     const epoch = requestEpoch.current;
+    let shouldRefocus = true;
 
     setMessages(nextMessages);
     setPrompt("");
     setPending(true);
     setError(null);
-    setAnnouncement("Sending message.");
+    setAnnouncement("Thinking.");
     record(content);
 
     try {
@@ -89,6 +101,8 @@ export function ChatShell() {
         return;
       }
 
+      setRenderingResponse(true);
+      shouldRefocus = false;
       setMessages((current) => [...current, result.message]);
       setAnnouncement(`Response: ${result.message.content}`);
     } catch {
@@ -100,7 +114,9 @@ export function ChatShell() {
     } finally {
       if (epoch === requestEpoch.current) {
         setPending(false);
-        requestAnimationFrame(focusPromptAtEnd);
+        if (shouldRefocus) {
+          requestAnimationFrame(focusPromptAtEnd);
+        }
       }
     }
   };
@@ -136,71 +152,102 @@ export function ChatShell() {
   };
 
   return (
-    <main className="shell" id="main-content" onClick={onShellClick}>
-      <div className="shell__inner">
-        <h1 className="sr-only">cekrauseee conversational shell</h1>
+    <main
+      className="shell"
+      id="main-content"
+      ref={viewportRef}
+      onClick={onShellClick}
+    >
+      <div
+        className="shell__track"
+        ref={trackRef}
+        style={{ translate: `0 ${-lineOffset}lh` }}
+      >
+        <div className="shell__inner">
+          <h1 className="sr-only">cekrauseee conversational shell</h1>
 
-        <ol className="conversation" aria-label="Conversation">
-          {messages.map((message, index) => (
-            <li
-              className="conversation__entry"
-              key={`${message.role}-${index}`}
+          <ol className="conversation" aria-label="Conversation">
+            {messages.map((message, index) => (
+              <li
+                className="conversation__entry"
+                key={`${message.role}-${index}`}
+              >
+                {message.role === "user" ? (
+                  <div className="prompt-line">
+                    <PromptPrefix />
+                    <span className="command">{message.content}</span>
+                  </div>
+                ) : (
+                  <MarkdownResponse
+                    content={message.content}
+                    onRevealComplete={
+                      renderingResponse && index === messages.length - 1
+                        ? finishResponseRendering
+                        : undefined
+                    }
+                  />
+                )}
+              </li>
+            ))}
+
+            {pending && (
+              <li className="conversation__entry" aria-hidden="true">
+                <p className="pending">
+                  <span className="pending__shimmer">
+                    {Array.from(THINKING_LABEL).map((character, index) => (
+                      <span
+                        className="pending__shimmer-character"
+                        style={{ animationDelay: `${index * 80}ms` }}
+                        key={`${character}-${index}`}
+                      >
+                        {character}
+                      </span>
+                    ))}
+                  </span>
+                </p>
+              </li>
+            )}
+          </ol>
+
+          {!pending && !renderingResponse && (
+            <form
+              className="composer"
+              onSubmit={submitPrompt}
+              aria-label="Send a message"
             >
-              {message.role === "user" ? (
-                <div className="prompt-line">
-                  <PromptPrefix />
-                  <span className="command">{message.content}</span>
-                </div>
-              ) : (
-                <MarkdownResponse content={message.content} />
+              <label className="sr-only" htmlFor="terminal-prompt">
+                Message
+              </label>
+              <div className="prompt-line">
+                <PromptPrefix />
+                <BlockCursorInput
+                  textareaRef={textareaRef}
+                  value={prompt}
+                  disabled={false}
+                  invalid={Boolean(error)}
+                  errorMessageId={error ? "prompt-error" : undefined}
+                  onChange={setPrompt}
+                  onKeyDown={onPromptKeyDown}
+                />
+              </div>
+
+              {error && (
+                <p className="error" id="prompt-error" role="alert">
+                  {error}
+                </p>
               )}
-            </li>
-          ))}
-        </ol>
+            </form>
+          )}
 
-        <form
-          className="composer"
-          onSubmit={submitPrompt}
-          aria-label="Send a message"
-        >
-          <label className="sr-only" htmlFor="terminal-prompt">
-            Message
-          </label>
-          <div className="prompt-line">
-            <PromptPrefix />
-            <BlockCursorInput
-              textareaRef={textareaRef}
-              value={prompt}
-              disabled={pending}
-              invalid={Boolean(error)}
-              errorMessageId={error ? "prompt-error" : undefined}
-              onChange={setPrompt}
-              onKeyDown={onPromptKeyDown}
-            />
+          <div
+            className="sr-only"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {announcement}
           </div>
-
-          {pending && (
-            <p className="pending" role="status">
-              Thinking
-            </p>
-          )}
-
-          {error && (
-            <p className="error" id="prompt-error" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-
-        <div
-          className="sr-only"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          {announcement}
         </div>
-        <div ref={endRef} aria-hidden="true" />
       </div>
     </main>
   );
