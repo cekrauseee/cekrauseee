@@ -50,9 +50,10 @@ environment setup, and current boundaries.
 
 ## Current boundaries
 
-The visible application remains the original terminal-inspired AI chat UI. The
-persistent workspace foundation is present on the server but is intentionally
-not wired into that UI yet. It does not expose host filesystem access, arbitrary
+The original terminal-inspired interface is the active workspace UI. Each
+command initializes or resumes the visitor's anonymous workspace, executes in
+`just-bash`, and persists its filesystem, current directory, and command
+transcript in PostgreSQL. It does not expose host filesystem access, arbitrary
 network access, a user account system, billing, or rate limits. Unit tests are
 database-free; the opt-in integration suite requires a disposable
 `TEST_DATABASE_URL`.

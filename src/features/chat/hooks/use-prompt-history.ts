@@ -42,5 +42,11 @@ export function usePromptHistory() {
     draft.current = "";
   }, []);
 
-  return { next, previous, record, resetCursor };
+  const restore = useCallback((values: string[]) => {
+    setHistory(values);
+    setCursor(null);
+    draft.current = "";
+  }, []);
+
+  return { next, previous, record, resetCursor, restore };
 }

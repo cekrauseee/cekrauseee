@@ -35,9 +35,8 @@ setup are needed but PostgreSQL will be supplied separately. Use
 
 ## Database operator flow
 
-`next build` does not open a database connection. The active chat UI does not
-yet invoke the workspace foundation, but a database must be configured before
-using its Server Actions or running the integration suite.
+`next build` does not open a database connection. A database must be configured
+before opening the active workspace UI or running the integration suite.
 
 1. Set `DATABASE_URL` in the environment used by the command.
 2. Run `npm run db:push` to apply the Drizzle schema to that database.
@@ -81,8 +80,9 @@ steps are explicit and require `TEST_DATABASE_URL`; CI provisions a disposable
 Postgres service and never supplies production database credentials.
 
 Read [Testing](testing.md) before adding coverage. For visual behavior, also
-verify the active chat UI manually in a browser: multiline input, prompt
-history, clear conversation, response rendering, and error states.
+verify the active workspace UI manually in a browser: multiline commands,
+persisted prompt history, Control/Command+L clearing only the visible
+transcript, command output, and error states.
 
 ## Conventions
 

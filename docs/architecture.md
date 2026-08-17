@@ -3,23 +3,20 @@
 ## System boundaries
 
 The project is a Next.js 16 App Router application. The active route preserves
-the original client-side chat shell and uses a Server Action for OpenAI
-requests. The repository also contains a server-side foundation for a future
-persistent virtual workspace, but it is not mounted by the active route.
+the original client-side terminal interface and connects it to a persistent
+virtual workspace through Server Actions.
 
 Commands run through `just-bash` over an in-memory filesystem rooted at
 `/workspace`. The host filesystem and network are not exposed to commands.
-When that foundation is wired into a future UI, workspace state is hydrated from
-validated persisted nodes before each command, then snapshotted back into the
-same transaction. A row lock serializes commands for one workspace; the
-transcript request ID supplies an idempotency boundary.
+Workspace state is hydrated from validated persisted nodes before each command,
+then snapshotted back into the same transaction. A row lock serializes commands
+for one workspace; the transcript request ID supplies an idempotency boundary.
 
 ## Components
 
 - `src/app/` defines the root layout and route.
-- `src/features/chat/components/chat-shell.tsx` owns the active chat UI,
-  keyboard behavior, status announcements, and transcript viewport.
-- `src/features/chat/actions.ts` validates messages and calls the OpenAI API.
+- `src/features/chat/components/chat-shell.tsx` preserves the active terminal
+  UI, keyboard behavior, status announcements, and transcript viewport.
 - `src/features/shell/actions.ts` exposes the initialize and execute Server
   Actions and maps failures to safe user-facing results.
 - `src/lib/auth/session.ts` provisions and verifies anonymous signed sessions.
@@ -32,18 +29,13 @@ transcript request ID supplies an idempotency boundary.
 
 ## Active request flow
 
-1. The chat shell appends a submitted prompt to local React state.
-2. It passes the conversation to `sendMessage`.
-3. The action validates the conversation and requests a non-streaming OpenAI
-   response.
-4. The client renders the safe Markdown response or an accessible error.
-
-## Future workspace foundation
-
-`initializeShell` and `executeShellCommand` can provision an anonymous session,
-load a workspace, execute `just-bash`, and persist the resulting filesystem and
-command transcript. No active client component imports or invokes these actions
-yet.
+1. The shell initializes an anonymous session and restores the persisted
+   transcript and prompt history.
+2. The client submits each command with a unique request ID to
+   `executeShellCommand`.
+3. The action validates the command, hydrates the virtual filesystem, executes
+   it with `just-bash`, and persists the snapshot, cwd, and transcript.
+4. The client renders plain command output or an accessible error.
 
 ## Invariants and unavailable features
 
@@ -51,8 +43,6 @@ yet.
   secret is sent to the browser.
 - Workspace paths must remain under `/workspace`; node count, file size,
   command input, and command output are bounded.
-- The active chat route has no database-backed conversation persistence.
-- The workspace foundation has no active UI yet.
 - There is no host filesystem access, arbitrary network access, Python or
   JavaScript command execution, account/profile UI, billing, rate limiting, or
   usage quota enforcement yet.

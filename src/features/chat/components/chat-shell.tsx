@@ -9,26 +9,47 @@ import {
   type MouseEvent,
   type SubmitEvent,
 } from "react";
-import { sendMessage } from "../actions";
-import type { ChatMessage } from "../types";
+import {
+  executeShellCommand,
+  initializeShell,
+  type ShellHistoryEntry,
+} from "../../shell/actions";
 import { usePromptHistory } from "../hooks/use-prompt-history";
 import { useTerminalScroll } from "../hooks/use-terminal-scroll";
 import { BlockCursorInput } from "./block-cursor-input";
-import { MarkdownResponse } from "./markdown-response";
 import { PromptPrefix } from "./prompt-prefix";
 
-const THINKING_LABEL = "Thinking";
+const RUNNING_LABEL = "Running";
+
+type TerminalEntry =
+  { kind: "command"; content: string } | { kind: "output"; content: string };
+
+function outputFrom(result: Pick<ShellHistoryEntry, "stdout" | "stderr">) {
+  return `${result.stdout}${result.stderr}`;
+}
+
+function entriesFrom(history: ShellHistoryEntry[]): TerminalEntry[] {
+  return history.flatMap((entry) => {
+    const output = outputFrom(entry);
+    return output
+      ? [
+          { kind: "command" as const, content: entry.command },
+          { kind: "output" as const, content: output },
+        ]
+      : [{ kind: "command" as const, content: entry.command }];
+  });
+}
 
 export function ChatShell() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [entries, setEntries] = useState<TerminalEntry[]>([]);
   const [prompt, setPrompt] = useState("");
+  const [initializing, setInitializing] = useState(true);
   const [pending, setPending] = useState(false);
-  const [renderingResponse, setRenderingResponse] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const requestEpoch = useRef(0);
-  const { next, previous, record, resetCursor } = usePromptHistory();
+  const { next, previous, record, resetCursor, restore } = usePromptHistory();
   const { lineOffset, scrollToEnd, trackRef, viewportRef } =
     useTerminalScroll();
 
@@ -42,20 +63,48 @@ export function ChatShell() {
 
   const clearShell = useCallback(() => {
     requestEpoch.current += 1;
-    setMessages([]);
+    setEntries([]);
     setPrompt("");
     setPending(false);
-    setRenderingResponse(false);
     setError(null);
-    setAnnouncement("Conversation cleared.");
+    setAnnouncement("Terminal cleared.");
     resetCursor();
     requestAnimationFrame(focusPromptAtEnd);
   }, [focusPromptAtEnd, resetCursor]);
 
-  const finishResponseRendering = useCallback(() => {
-    setRenderingResponse(false);
-    requestAnimationFrame(focusPromptAtEnd);
-  }, [focusPromptAtEnd]);
+  useEffect(() => {
+    let active = true;
+
+    void initializeShell()
+      .then((result) => {
+        if (!active) return;
+
+        if (!result.ok) {
+          setError(result.error);
+          setAnnouncement(`Terminal initialization failed: ${result.error}`);
+          return;
+        }
+
+        setEntries(entriesFrom(result.session.history));
+        restore(result.session.history.map((entry) => entry.command));
+        setAnnouncement("Terminal ready.");
+      })
+      .catch(() => {
+        if (!active) return;
+        const message = "The shell could not be initialized. Try reloading.";
+        setError(message);
+        setAnnouncement(message);
+      })
+      .finally(() => {
+        if (!active) return;
+        setInitializing(false);
+        requestAnimationFrame(focusPromptAtEnd);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [focusPromptAtEnd, restore]);
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -71,28 +120,28 @@ export function ChatShell() {
 
   useEffect(() => {
     scrollToEnd();
-  }, [error, messages, pending, scrollToEnd]);
+  }, [entries, error, initializing, pending, scrollToEnd]);
 
   const submitPrompt = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const content = prompt.trim();
-    if (!content || pending || renderingResponse) return;
+    if (!content || initializing || pending) return;
 
-    const userMessage: ChatMessage = { role: "user", content };
-    const nextMessages = [...messages, userMessage];
     const epoch = requestEpoch.current;
-    let shouldRefocus = true;
 
-    setMessages(nextMessages);
+    setEntries((current) => [...current, { kind: "command", content }]);
     setPrompt("");
     setPending(true);
     setError(null);
-    setAnnouncement("Thinking.");
+    setAnnouncement("Running command.");
     record(content);
 
     try {
-      const result = await sendMessage(nextMessages);
+      const result = await executeShellCommand({
+        command: content,
+        requestId: crypto.randomUUID(),
+      });
       if (epoch !== requestEpoch.current) return;
 
       if (!result.ok) {
@@ -101,22 +150,27 @@ export function ChatShell() {
         return;
       }
 
-      setRenderingResponse(true);
-      shouldRefocus = false;
-      setMessages((current) => [...current, result.message]);
-      setAnnouncement(`Response: ${result.message.content}`);
+      const output = outputFrom(result.result);
+      if (output) {
+        setEntries((current) => [
+          ...current,
+          { kind: "output", content: output },
+        ]);
+      }
+      setAnnouncement(
+        result.result.exitCode === 0
+          ? "Command completed."
+          : `Command exited with status ${result.result.exitCode}.`,
+      );
     } catch {
       if (epoch !== requestEpoch.current) return;
-      const message =
-        "The response could not be loaded. Try sending your message again.";
+      const message = "The command could not be run. Try it again.";
       setError(message);
       setAnnouncement(message);
     } finally {
       if (epoch === requestEpoch.current) {
         setPending(false);
-        if (shouldRefocus) {
-          requestAnimationFrame(focusPromptAtEnd);
-        }
+        requestAnimationFrame(focusPromptAtEnd);
       }
     }
   };
@@ -166,26 +220,21 @@ export function ChatShell() {
         <div className="shell__inner">
           <h1 className="sr-only">shell interactive shell</h1>
 
-          <ol className="conversation" aria-label="Conversation">
-            {messages.map((message, index) => (
+          <ol className="conversation" aria-label="Terminal transcript">
+            {entries.map((entry, index) => (
               <li
                 className="conversation__entry"
-                key={`${message.role}-${index}`}
+                key={`${entry.kind}-${index}`}
               >
-                {message.role === "user" ? (
+                {entry.kind === "command" ? (
                   <div className="prompt-line">
                     <PromptPrefix />
-                    <span className="command">{message.content}</span>
+                    <span className="command">{entry.content}</span>
                   </div>
                 ) : (
-                  <MarkdownResponse
-                    content={message.content}
-                    onRevealComplete={
-                      renderingResponse && index === messages.length - 1
-                        ? finishResponseRendering
-                        : undefined
-                    }
-                  />
+                  <div className="response">
+                    <span className="command">{entry.content}</span>
+                  </div>
                 )}
               </li>
             ))}
@@ -194,7 +243,7 @@ export function ChatShell() {
               <li className="conversation__entry" aria-hidden="true">
                 <p className="pending">
                   <span className="pending__shimmer">
-                    {Array.from(THINKING_LABEL).map((character, index) => (
+                    {Array.from(RUNNING_LABEL).map((character, index) => (
                       <span
                         className="pending__shimmer-character"
                         style={{ animationDelay: `${index * 80}ms` }}
@@ -209,14 +258,14 @@ export function ChatShell() {
             )}
           </ol>
 
-          {!pending && !renderingResponse && (
+          {!initializing && !pending && (
             <form
               className="composer"
               onSubmit={submitPrompt}
-              aria-label="Send a message"
+              aria-label="Run a shell command"
             >
               <label className="sr-only" htmlFor="terminal-prompt">
-                Message
+                Command
               </label>
               <div className="prompt-line">
                 <PromptPrefix />
