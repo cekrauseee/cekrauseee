@@ -19,8 +19,6 @@ import { useTerminalScroll } from "../hooks/use-terminal-scroll";
 import { BlockCursorInput } from "./block-cursor-input";
 import { PromptPrefix } from "./prompt-prefix";
 
-const RUNNING_LABEL = "Running";
-
 type TerminalEntry =
   { kind: "command"; content: string } | { kind: "output"; content: string };
 
@@ -238,27 +236,9 @@ export function ChatShell() {
                 )}
               </li>
             ))}
-
-            {pending && (
-              <li className="conversation__entry" aria-hidden="true">
-                <p className="pending">
-                  <span className="pending__shimmer">
-                    {Array.from(RUNNING_LABEL).map((character, index) => (
-                      <span
-                        className="pending__shimmer-character"
-                        style={{ animationDelay: `${index * 80}ms` }}
-                        key={`${character}-${index}`}
-                      >
-                        {character}
-                      </span>
-                    ))}
-                  </span>
-                </p>
-              </li>
-            )}
           </ol>
 
-          {!initializing && !pending && (
+          {!initializing && (
             <form
               className="composer"
               onSubmit={submitPrompt}
@@ -272,7 +252,7 @@ export function ChatShell() {
                 <BlockCursorInput
                   textareaRef={textareaRef}
                   value={prompt}
-                  disabled={false}
+                  disabled={pending}
                   invalid={Boolean(error)}
                   errorMessageId={error ? "prompt-error" : undefined}
                   onChange={setPrompt}

@@ -352,44 +352,6 @@ textarea {
   opacity: 0.55;
 }
 
-.pending {
-  display: flex;
-  align-items: center;
-  min-height: 1.6em;
-  margin: 0;
-  color: var(--text-muted);
-  font-size: inherit;
-  line-height: inherit;
-}
-
-.pending__shimmer {
-  display: inline-flex;
-}
-
-.pending__shimmer-character {
-  color: var(--text-muted);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .pending__shimmer-character {
-    animation: terminal-shimmer 1120ms steps(1, end) infinite;
-  }
-}
-
-@keyframes terminal-shimmer {
-  0%,
-  16%,
-  34%,
-  100% {
-    color: var(--text-muted);
-  }
-
-  17%,
-  33% {
-    color: var(--text);
-  }
-}
-
 .error {
   max-width: 65ch;
   margin: 0.65rem 0 0;
