@@ -4,7 +4,12 @@ import { posix } from "node:path";
 // The browser-targeted just-bash bundle is still a pure virtual filesystem
 // runtime, but avoids optional native sqlite compression modules that cannot be
 // placed in Turbopack's server ESM chunks.
-import { Bash, InMemoryFs, type IFileSystem } from "just-bash/browser";
+import {
+  Bash,
+  defineCommand,
+  InMemoryFs,
+  type IFileSystem,
+} from "just-bash/browser";
 
 export const WORKSPACE_ROOT = "/workspace";
 export const MAX_NODE_COUNT = 2_000;
@@ -21,6 +26,10 @@ export type PersistedNode = {
   contentBase64?: string;
   target?: string;
   sizeBytes: number;
+};
+
+export type ShellHistoryCommand = {
+  command: string;
 };
 
 function isWorkspacePath(value: string) {
@@ -178,7 +187,185 @@ export async function snapshotWorkspace(
   return nodes;
 }
 
-export function createBash(fs: IFileSystem, cwd: string) {
+function formatHistoryCommand(command: string) {
+  const oneLine = command.replaceAll(/\s+/g, " ").trim();
+  return oneLine.length > 160 ? `${oneLine.slice(0, 157)}...` : oneLine;
+}
+
+function unavailableJobControlCommand(name: string) {
+  return defineCommand(name, async () => ({
+    stdout: "",
+    stderr: `bash: ${name}: job control is not supported in this virtual shell\n`,
+    exitCode: 2,
+  }));
+}
+
+function unavailableShellFeatureCommand(name: string) {
+  return defineCommand(name, async () => ({
+    stdout: "",
+    stderr: `bash: ${name}: not supported in this virtual shell\n`,
+    exitCode: 2,
+  }));
+}
+
+function logoutCommand() {
+  return defineCommand("logout", async () => ({
+    stdout: "",
+    stderr: "bash: logout: not login shell\n",
+    exitCode: 1,
+  }));
+}
+
+function createHistoryCommand(history: ShellHistoryCommand[]) {
+  return defineCommand("history", async (args) => {
+    if (args.length > 1 || (args[0] && !/^\d+$/.test(args[0]))) {
+      return {
+        stdout: "",
+        stderr: "history: usage: history [n]\n",
+        exitCode: 2,
+      };
+    }
+
+    const requested = args[0] ? Number(args[0]) : history.length;
+    const entries = history.slice(-requested);
+    const firstNumber = history.length - entries.length + 1;
+    const stdout = entries
+      .map(
+        (entry, index) =>
+          `${String(firstNumber + index).padStart(5)}  ${formatHistoryCommand(entry.command)}\n`,
+      )
+      .join("");
+
+    return { stdout, stderr: "", exitCode: 0 };
+  });
+}
+
+export function containsBackgroundOperator(command: string) {
+  let quote: "single" | "double" | null = null;
+  let escaped = false;
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "single") {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" && quote !== "double") {
+      quote = quote === "single" ? null : "single";
+      continue;
+    }
+    if (character === '"' && quote !== "single") {
+      quote = quote === "double" ? null : "double";
+      continue;
+    }
+    if (quote) continue;
+
+    if (
+      character === "#" &&
+      (index === 0 || /\s/.test(command[index - 1] ?? ""))
+    ) {
+      const nextLine = command.indexOf("\n", index);
+      if (nextLine === -1) return false;
+      index = nextLine;
+      continue;
+    }
+    if (character !== "&") continue;
+
+    const previous = command[index - 1];
+    const next = command[index + 1];
+    if (previous !== "&" && next !== "&" && previous !== ">" && next !== ">") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+const unsupportedJobControlCommands = new Set(["fc", "jobs", "kill", "wait"]);
+
+export function getUnsupportedShellFeature(command: string) {
+  if (containsBackgroundOperator(command)) return "background jobs";
+
+  let quote: "single" | "double" | null = null;
+  let escaped = false;
+  let commandStart = true;
+  let word = "";
+
+  const inspectWord = () => {
+    if (!word) return null;
+    const currentWord = word;
+    word = "";
+
+    if (!commandStart) return null;
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*=/.test(currentWord)) return null;
+    commandStart = false;
+    return unsupportedJobControlCommands.has(currentWord) ? currentWord : null;
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+
+    if (escaped) {
+      word += character;
+      escaped = false;
+      continue;
+    }
+    if (character === "\\" && quote !== "single") {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" && quote !== "double") {
+      quote = quote === "single" ? null : "single";
+      continue;
+    }
+    if (character === '"' && quote !== "single") {
+      quote = quote === "double" ? null : "double";
+      continue;
+    }
+    if (quote) {
+      word += character;
+      continue;
+    }
+
+    if (
+      character === "#" &&
+      !word &&
+      (index === 0 || /\s/.test(command[index - 1] ?? ""))
+    ) {
+      const nextLine = command.indexOf("\n", index);
+      if (nextLine === -1) return null;
+      index = nextLine;
+      commandStart = true;
+      continue;
+    }
+    if (/\s/.test(character)) {
+      const unsupported = inspectWord();
+      if (unsupported) return unsupported;
+      continue;
+    }
+    if (character === ";" || character === "|" || character === "\n") {
+      const unsupported = inspectWord();
+      if (unsupported) return unsupported;
+      commandStart = true;
+      continue;
+    }
+
+    word += character;
+  }
+
+  return inspectWord();
+}
+
+export function createBash(
+  fs: IFileSystem,
+  cwd: string,
+  history: ShellHistoryCommand[] = [],
+) {
   const safeCwd =
     cwd === WORKSPACE_ROOT || cwd.startsWith(`${WORKSPACE_ROOT}/`)
       ? cwd
@@ -190,6 +377,16 @@ export function createBash(fs: IFileSystem, cwd: string) {
     python: false,
     javascript: false,
     // Network is intentionally omitted: curl/wget are not registered.
+    customCommands: [
+      createHistoryCommand(history),
+      unavailableJobControlCommand("jobs"),
+      unavailableJobControlCommand("wait"),
+      unavailableJobControlCommand("kill"),
+      unavailableJobControlCommand("fc"),
+      unavailableShellFeatureCommand("ulimit"),
+      unavailableShellFeatureCommand("umask"),
+      logoutCommand(),
+    ],
     executionLimits: {
       maxExecutionTimeMs: 3_000,
       maxCommandCount: 500,

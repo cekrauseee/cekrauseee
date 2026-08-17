@@ -20,6 +20,7 @@ import {
   completeShellInput,
   executeShellCommand,
   initializeShell,
+  type ExecuteShellCommandResult,
 } from "@/features/shell/actions";
 import { ShellTerminal } from "@/features/shell/components/shell-terminal";
 
@@ -139,6 +140,34 @@ describe("ShellTerminal action wiring", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders multiline output inline with the terminal transcript", async () => {
+    mockedExecuteShellCommand.mockResolvedValueOnce({
+      ok: true,
+      result: {
+        command: "history",
+        stdout: "    1  pwd\n    2  history\n",
+        stderr: "",
+        exitCode: 0,
+        cwd: "/workspace",
+        revision: 4,
+      },
+    });
+
+    render(<ShellTerminal />);
+    const input = await screen.findByRole("textbox", { name: "Command" });
+    fireEvent.change(input, { target: { value: "history" } });
+    fireEvent.submit(screen.getByRole("form", { name: "Run a shell command" }));
+
+    const output = await screen.findByText(
+      (_content, element) =>
+        element?.tagName === "SPAN" &&
+        element.classList.contains("command") &&
+        element.textContent === "    1  pwd\n    2  history\n",
+    );
+    expect(output).toHaveClass("command");
+    expect(output.parentElement).toHaveClass("response");
+  });
+
   it("clears the persisted transcript with clear and Control+L", async () => {
     render(<ShellTerminal />);
     const input = await screen.findByRole("textbox", { name: "Command" });
@@ -187,6 +216,75 @@ describe("ShellTerminal action wiring", () => {
     input.blur();
 
     await waitFor(() => expect(input).toHaveFocus());
+  });
+
+  it("submits with Enter, starts a new prompt for a blank command, and ignores Shift+Enter", async () => {
+    render(<ShellTerminal />);
+    const input = await screen.findByRole("textbox", { name: "Command" });
+
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(false);
+    expect(mockedExecuteShellCommand).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("Current directory: ~")).toHaveLength(3),
+    );
+    expect(fireEvent.keyDown(input, { key: "Enter", shiftKey: true })).toBe(
+      false,
+    );
+    expect(mockedExecuteShellCommand).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: "printf one\nprintf two" } });
+    expect(input).toHaveValue("printf one");
+    expect(fireEvent.keyDown(input, { key: "Enter" })).toBe(false);
+
+    await waitFor(() =>
+      expect(mockedExecuteShellCommand).toHaveBeenCalledWith({
+        command: "printf one",
+        requestId: expect.any(String),
+      }),
+    );
+    expect(input).toHaveAttribute(
+      "aria-keyshortcuts",
+      expect.stringContaining("Enter"),
+    );
+  });
+
+  it("interrupts an in-flight command with Control+C and discards its late result", async () => {
+    let resolveCommand!: (result: ExecuteShellCommandResult) => void;
+    mockedExecuteShellCommand.mockImplementationOnce(
+      () =>
+        new Promise<ExecuteShellCommandResult>((resolve) => {
+          resolveCommand = resolve;
+        }),
+    );
+
+    render(<ShellTerminal />);
+    const input = await screen.findByRole("textbox", { name: "Command" });
+    fireEvent.change(input, { target: { value: "sleep 1" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(input).toBeDisabled());
+    expect(fireEvent.keyDown(window, { key: "c", ctrlKey: true })).toBe(false);
+    expect(await screen.findByText("sleep 1^C")).toBeInTheDocument();
+    expect(screen.queryByText("^C")).toBeNull();
+    expect(input).not.toBeDisabled();
+    expect(input).toHaveAttribute(
+      "aria-keyshortcuts",
+      expect.stringContaining("Control+C"),
+    );
+
+    resolveCommand({
+      ok: true,
+      result: {
+        command: "sleep 1",
+        stdout: "late result\n",
+        stderr: "",
+        exitCode: 0,
+        cwd: "/workspace",
+        revision: 4,
+      },
+    });
+
+    await waitFor(() => expect(screen.queryByText("late result")).toBeNull());
   });
 
   it("cycles completion candidates with Tab and closes the menu with Escape", async () => {

@@ -18,6 +18,15 @@ describe("getShellCompletion", () => {
     expect(completion.candidates).toContain("mkdir");
   });
 
+  it("does not advertise unavailable job-control commands", () => {
+    expect(
+      getShellCompletion("jo", 2, "/workspace", nodes).candidates,
+    ).not.toContain("jobs");
+    expect(
+      getShellCompletion("wa", 2, "/workspace", nodes).candidates,
+    ).not.toContain("wait");
+  });
+
   it("returns files and directories from the current workspace path", () => {
     expect(getShellCompletion("cat re", 6, "/workspace", nodes)).toEqual({
       start: 4,

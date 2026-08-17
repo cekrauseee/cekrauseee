@@ -31,12 +31,10 @@ const shellBuiltins = [
   "exit",
   "export",
   "false",
-  "fc",
   "getopts",
   "hash",
   "help",
   "history",
-  "jobs",
   "let",
   "local",
   "popd",
@@ -57,9 +55,8 @@ const shellBuiltins = [
   "umask",
   "unalias",
   "unset",
-  "wait",
 ];
-const commandNames = [
+export const shellCommandNames = [
   ...new Set([...getCommandNames(), ...shellBuiltins]),
 ].sort((left, right) => left.localeCompare(right));
 
@@ -142,7 +139,7 @@ export function getShellCompletion(
     !target.word.startsWith(".") &&
     !target.word.startsWith("/") &&
     !target.word.startsWith("~/")
-      ? commandNames.filter((name) => name.startsWith(target.word))
+      ? shellCommandNames.filter((name) => name.startsWith(target.word))
       : pathCandidates(target.word, cwd, nodes);
 
   return { candidates, start: target.start, end: target.end };

@@ -22,7 +22,12 @@ import { BlockCursorInput } from "./block-cursor-input";
 import { PromptPrefix } from "./prompt-prefix";
 
 type TerminalEntry =
-  | { kind: "command"; content: string; cwd: string }
+  | {
+      kind: "command";
+      content: string;
+      cwd: string;
+      interrupted?: boolean;
+    }
   | { kind: "output"; content: string };
 
 type CompletionMenu = {
@@ -135,6 +140,33 @@ export function ShellTerminal() {
     }
   }, [focusPromptAtEnd, resetCursor]);
 
+  const interruptCommand = useCallback(() => {
+    if (initializing) return;
+
+    requestEpoch.current += 1;
+    completionEpoch.current += 1;
+    setEntries((current) => {
+      if (pending) {
+        const lastEntry = current.at(-1);
+        if (lastEntry?.kind === "command") {
+          return [...current.slice(0, -1), { ...lastEntry, interrupted: true }];
+        }
+      }
+
+      return [
+        ...current,
+        { kind: "command", content: prompt, cwd, interrupted: true },
+      ];
+    });
+    setPrompt("");
+    setCompletion(null);
+    setPending(false);
+    setError(null);
+    setAnnouncement(pending ? "Command interrupted." : "Input canceled.");
+    resetCursor();
+    requestAnimationFrame(focusPromptAtEnd);
+  }, [cwd, focusPromptAtEnd, initializing, pending, prompt, resetCursor]);
+
   useEffect(() => {
     let active = true;
 
@@ -175,6 +207,12 @@ export function ShellTerminal() {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Tab") event.preventDefault();
 
+      if (event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        interruptCommand();
+        return;
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "l") {
         event.preventDefault();
         void clearShell();
@@ -194,7 +232,7 @@ export function ShellTerminal() {
       window.removeEventListener("focus", onWindowFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [clearShell, restorePromptFocus]);
+  }, [clearShell, interruptCommand, restorePromptFocus]);
 
   useEffect(() => {
     scrollToEnd();
@@ -204,7 +242,21 @@ export function ShellTerminal() {
     event.preventDefault();
 
     const content = prompt.trim();
-    if (!content || initializing || pending) return;
+    if (initializing || pending) return;
+
+    if (!content) {
+      completionEpoch.current += 1;
+      setEntries((current) => [
+        ...current,
+        { kind: "command", content: "", cwd },
+      ]);
+      setPrompt("");
+      setCompletion(null);
+      setError(null);
+      setAnnouncement("Prompt ready.");
+      requestAnimationFrame(focusPromptAtEnd);
+      return;
+    }
 
     if (content === "clear") {
       await clearShell();
@@ -332,7 +384,7 @@ export function ShellTerminal() {
   const onPromptChange = useCallback((value: string) => {
     completionEpoch.current += 1;
     setCompletion(null);
-    setPrompt(value);
+    setPrompt(value.split(/\r?\n/, 1)[0] ?? "");
   }, []);
 
   const onPromptKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -378,8 +430,9 @@ export function ShellTerminal() {
       return;
     }
 
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === "Enter") {
       event.preventDefault();
+      if (event.shiftKey) return;
       event.currentTarget.form?.requestSubmit();
     }
   };
@@ -417,7 +470,10 @@ export function ShellTerminal() {
                 {entry.kind === "command" ? (
                   <div className="prompt-line">
                     <PromptPrefix cwd={entry.cwd} />
-                    <span className="command">{entry.content}</span>
+                    <span className="command">
+                      {entry.content}
+                      {entry.interrupted ? "^C" : ""}
+                    </span>
                   </div>
                 ) : (
                   <div className="response">

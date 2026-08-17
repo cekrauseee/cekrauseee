@@ -7,6 +7,7 @@ import { requireAnonymousSession } from "@/lib/auth/session";
 import { getDb, type Database } from "@/lib/db";
 import { transcripts, workspaceNodes, workspaces } from "@/lib/db/schema";
 import {
+  getUnsupportedShellFeature,
   MAX_COMMAND_BYTES,
   createBash,
   restoreWorkspace,
@@ -227,6 +228,11 @@ async function executeInTransaction(
       .select()
       .from(workspaceNodes)
       .where(eq(workspaceNodes.workspaceId, workspaceId));
+    const historyRows = await tx
+      .select({ command: transcripts.command })
+      .from(transcripts)
+      .where(eq(transcripts.workspaceId, workspaceId))
+      .orderBy(transcripts.createdAt, transcripts.id);
     const fs = await restoreWorkspace(
       nodeRows.map((node) => ({
         path: node.path,
@@ -237,8 +243,16 @@ async function executeInTransaction(
         sizeBytes: node.sizeBytes,
       })),
     );
-    const bash = createBash(fs, safeCwd(workspace.cwd));
-    const execution = await bash.exec(command);
+    const bash = createBash(fs, safeCwd(workspace.cwd), historyRows);
+    const unsupportedFeature = getUnsupportedShellFeature(command);
+    const execution = unsupportedFeature
+      ? {
+          stdout: "",
+          stderr: `bash: ${unsupportedFeature}: not supported in this virtual shell\n`,
+          exitCode: 2,
+          env: { PWD: safeCwd(workspace.cwd) },
+        }
+      : await bash.exec(command);
     // just-bash restores its host execution state after exec(); the final
     // shell PWD is returned in the serializable environment instead.
     const cwd = safeCwd(execution.env?.PWD ?? bash.getCwd());

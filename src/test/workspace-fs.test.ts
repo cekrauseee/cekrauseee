@@ -1,7 +1,13 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
 
+import { shellCommandNames } from "@/lib/shell-completion";
 import {
   assertWorkspaceQuota,
+  containsBackgroundOperator,
+  createBash,
+  getUnsupportedShellFeature,
   restoreWorkspace,
   snapshotWorkspace,
   WORKSPACE_ROOT,
@@ -117,5 +123,63 @@ describe("workspace filesystem persistence", () => {
         },
       ]),
     ).toThrow("workspace root is missing");
+  });
+
+  it("provides persisted history while rejecting unsupported job control", async () => {
+    const fs = await restoreWorkspace([root]);
+    const bash = createBash(fs, WORKSPACE_ROOT, [
+      { command: "pwd" },
+      {
+        command:
+          "printf 'a command that should remain readable in the history output'",
+      },
+    ]);
+
+    await expect(bash.exec("history 1")).resolves.toMatchObject({
+      stdout:
+        "    2  printf 'a command that should remain readable in the history output'\n",
+      stderr: "",
+      exitCode: 0,
+    });
+    for (const command of ["jobs", "kill", "fc"]) {
+      await expect(bash.exec(command)).resolves.toMatchObject({
+        stdout: "",
+        stderr: `bash: ${command}: job control is not supported in this virtual shell\n`,
+        exitCode: 2,
+      });
+    }
+    await expect(bash.exec("logout")).resolves.toMatchObject({
+      stdout: "",
+      stderr: "bash: logout: not login shell\n",
+      exitCode: 1,
+    });
+  });
+
+  it("recognizes only real background operators", () => {
+    expect(containsBackgroundOperator("sleep 1 &")).toBe(true);
+    expect(containsBackgroundOperator("echo '&' && echo done")).toBe(false);
+    expect(containsBackgroundOperator("echo hi # &")).toBe(false);
+    expect(containsBackgroundOperator("echo hi # &\nsleep 1 &")).toBe(true);
+    expect(containsBackgroundOperator("echo hi &> output.txt")).toBe(false);
+  });
+
+  it("rejects every unsupported job-control command before execution", () => {
+    expect(getUnsupportedShellFeature("wait")).toBe("wait");
+    expect(getUnsupportedShellFeature("jobs; echo done")).toBe("jobs");
+    expect(getUnsupportedShellFeature("echo wait")).toBeNull();
+    expect(getUnsupportedShellFeature("echo '&' && echo done")).toBeNull();
+    expect(getUnsupportedShellFeature("sleep 1 &")).toBe("background jobs");
+  });
+
+  it("does not advertise a command that resolves as not found", async () => {
+    const fs = await restoreWorkspace([root]);
+    const bash = createBash(fs, WORKSPACE_ROOT);
+
+    for (const command of shellCommandNames) {
+      const result = await bash.exec(command);
+      expect(result.stderr).not.toContain(
+        `bash: ${command}: command not found`,
+      );
+    }
   });
 });

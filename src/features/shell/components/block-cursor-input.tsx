@@ -159,7 +159,7 @@ export function BlockCursorInput({
         aria-invalid={invalid || undefined}
         aria-errormessage={errorMessageId}
         aria-controls={completionMenuId}
-        aria-keyshortcuts="Tab Shift+Tab Escape ArrowUp ArrowDown Shift+PageUp Shift+PageDown Control+L Meta+L"
+        aria-keyshortcuts="Enter Control+C Tab Shift+Tab Escape ArrowUp ArrowDown Shift+PageUp Shift+PageDown Control+L Meta+L"
         onChange={(event) => {
           onChange(event.currentTarget.value);
           setCaretIndex(getCaretIndex(event.currentTarget));
