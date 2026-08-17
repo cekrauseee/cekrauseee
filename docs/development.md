@@ -2,7 +2,7 @@
 
 ## Prerequisites and environment
 
-- Node.js 20.9 or later
+- Node.js 22.22.2 or later
 - npm
 - PostgreSQL locally, or a compatible Neon database
 

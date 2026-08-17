@@ -1,12 +1,12 @@
 import react from "@vitejs/plugin-react";
-import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
 const integration = process.env.VITEST_INTEGRATION === "1";
 
 export default defineConfig({
-  plugins: [tsconfigPaths(), react()],
+  plugins: [react()],
   resolve: {
+    tsconfigPaths: true,
     alias: {
       // `workspace-fs` is server-only in the Next runtime. The test suite
       // exercises its pure filesystem functions without a React server
