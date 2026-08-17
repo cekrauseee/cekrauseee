@@ -2,23 +2,24 @@
 
 ## System boundaries
 
-The project is a Next.js 16 App Router application. The browser owns terminal
-input and transcript presentation. Server Actions own session lookup,
-validation, database transactions, and virtual command execution. PostgreSQL
-stores only the anonymous identity/session records, workspace nodes, cwd and
-revision, and bounded command transcripts.
+The project is a Next.js 16 App Router application. The active route preserves
+the original client-side chat shell and uses a Server Action for OpenAI
+requests. The repository also contains a server-side foundation for a future
+persistent virtual workspace, but it is not mounted by the active route.
 
 Commands run through `just-bash` over an in-memory filesystem rooted at
 `/workspace`. The host filesystem and network are not exposed to commands.
-Workspace state is hydrated from validated persisted nodes before each command,
-then snapshotted back into the same transaction. A row lock serializes commands
-for one workspace; the transcript request ID supplies an idempotency boundary.
+When that foundation is wired into a future UI, workspace state is hydrated from
+validated persisted nodes before each command, then snapshotted back into the
+same transaction. A row lock serializes commands for one workspace; the
+transcript request ID supplies an idempotency boundary.
 
 ## Components
 
 - `src/app/` defines the root layout and route.
-- `src/features/terminal/components/terminal-shell.tsx` owns the client UI,
+- `src/features/chat/components/chat-shell.tsx` owns the active chat UI,
   keyboard behavior, status announcements, and transcript viewport.
+- `src/features/chat/actions.ts` validates messages and calls the OpenAI API.
 - `src/features/shell/actions.ts` exposes the initialize and execute Server
   Actions and maps failures to safe user-facing results.
 - `src/lib/auth/session.ts` provisions and verifies anonymous signed sessions.
@@ -29,18 +30,20 @@ for one workspace; the transcript request ID supplies an idempotency boundary.
 - `src/test/` contains database-free unit/component tests plus an explicitly
   gated local-Postgres persistence test.
 
-## Request flow
+## Active request flow
 
-1. The terminal mounts and calls `initializeShell`.
-2. The action authenticates the `__Host-shell_session` cookie or provisions an
-   anonymous user, session, and default workspace.
-3. The action returns cwd, revision, and bounded transcript history.
-4. A submitted command is validated, then runs inside a database transaction
-   that locks the workspace row.
-5. The action restores the virtual filesystem, executes `just-bash`, snapshots
-   nodes, writes the transcript, advances the revision, and returns output.
-6. The client renders stdout/stderr, exit status, cwd, and an accessible status
-   announcement. Clear view removes only the visible transcript.
+1. The chat shell appends a submitted prompt to local React state.
+2. It passes the conversation to `sendMessage`.
+3. The action validates the conversation and requests a non-streaming OpenAI
+   response.
+4. The client renders the safe Markdown response or an accessible error.
+
+## Future workspace foundation
+
+`initializeShell` and `executeShellCommand` can provision an anonymous session,
+load a workspace, execute `just-bash`, and persist the resulting filesystem and
+command transcript. No active client component imports or invokes these actions
+yet.
 
 ## Invariants and unavailable features
 
@@ -48,13 +51,11 @@ for one workspace; the transcript request ID supplies an idempotency boundary.
   secret is sent to the browser.
 - Workspace paths must remain under `/workspace`; node count, file size,
   command input, and command output are bounded.
-- A terminal reload restores workspace data and bounded command history.
-- Clear view does not delete persisted workspace data.
+- The active chat route has no database-backed conversation persistence.
+- The workspace foundation has no active UI yet.
 - There is no host filesystem access, arbitrary network access, Python or
   JavaScript command execution, account/profile UI, billing, rate limiting, or
   usage quota enforcement yet.
-- The dormant chat source still imports `openai`, but the terminal route does
-  not call it and does not provide an AI chat feature.
 - Unit CI tests remain database-free. The separate integration job provisions a
   disposable Postgres service, pushes the schema explicitly, and uses only
   `TEST_DATABASE_URL`; no production Neon credentials are needed.

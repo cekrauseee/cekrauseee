@@ -2,31 +2,27 @@
 
 ## Purpose
 
-shell is a small, terminal-inspired web application for running commands in a
-safe virtual workspace that survives page reloads. It gives each visitor an
-anonymous signed session and a PostgreSQL-backed workspace.
+shell is a terminal-inspired AI chat application. Its original neutral shell
+interface remains the active product experience. The repository also contains
+the first server-side foundation for a future persistent virtual workspace.
 
 ## Current capabilities
 
-The terminal supports common `just-bash` commands, multiline input, prompt
-history, cwd changes, stdout/stderr and exit status, transcript history, clear
-view, accessible pending/error announcements, bounded persistence, and
-restoration after a reload. Commands execute in memory under `/workspace`;
-each successful command advances a workspace revision.
+The active UI supports multiline prompts, prompt history, Control/Command+L to
+clear the conversation, accessible pending/error announcements, and safe
+Markdown responses from the OpenAI chat action. It does not currently expose
+the virtual workspace foundation.
 
 ## Intentionally unavailable
 
-There is no host filesystem access, arbitrary network access, Python or
-JavaScript execution, account/profile UI, billing, rate limiting, usage quotas,
-or AI chat behavior on the terminal route. The older chat source remains
-dormant and its `openai` dependency is retained because it still imports the
-client. Unit CI remains database-free; a separate opt-in integration job uses
-only a disposable `TEST_DATABASE_URL`.
+There is no visible interactive Bash interface, host filesystem access,
+arbitrary network access, Python or JavaScript execution, account/profile UI,
+billing, rate limiting, or usage quotas. Unit CI remains database-free; a
+separate integration job uses only a disposable `TEST_DATABASE_URL`.
 
 ## User and data boundaries
 
-The browser holds only the active terminal presentation. Server Actions
-authenticate the signed cookie, execute commands, and persist validated
-workspace nodes and bounded transcripts. Clearing the viewport removes visible
-history only; it does not delete the workspace. Reloading restores persisted
-cwd, revision, files, and command history.
+The browser holds the active chat conversation. The future workspace foundation
+keeps anonymous signed sessions, validated workspace nodes, bounded command
+transcripts, and revisioned state on the server, but no active route invokes it
+yet.

@@ -50,13 +50,12 @@ environment setup, and current boundaries.
 
 ## Current boundaries
 
-The terminal supports common virtual-shell commands, multiline input, command
-history, transcript clearing, persistent cwd/files, and restoration after a
-reload. It intentionally does not provide host filesystem access, arbitrary
+The visible application remains the original terminal-inspired AI chat UI. The
+persistent workspace foundation is present on the server but is intentionally
+not wired into that UI yet. It does not expose host filesystem access, arbitrary
 network access, a user account system, billing, or rate limits. Unit tests are
 database-free; the opt-in integration suite requires a disposable
-`TEST_DATABASE_URL`. The dormant chat source remains in the repository, but the
-terminal path does not invoke OpenAI.
+`TEST_DATABASE_URL`.
 
 ## License
 
