@@ -18,7 +18,7 @@ npm run setup:local
 
 The setup command installs dependencies, keeps any existing local values,
 generates `SESSION_SECRET` when necessary, starts the local PostgreSQL service,
-and pushes the Drizzle schema. It requires Docker or OrbStack to be running.
+creates the separate `shell_test` database, and pushes both schemas. It requires Docker or OrbStack to be running.
 Keep `.env.local` private and never commit it.
 
 Then start the app:

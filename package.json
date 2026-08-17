@@ -8,14 +8,14 @@
     "start": "next start",
     "setup:local": "node scripts/setup-local.mjs",
     "db:push": "drizzle-kit push",
-    "db:push:test": "sh -c 'test -n \"$TEST_DATABASE_URL\" || { echo \"TEST_DATABASE_URL is required\" >&2; exit 1; }; DATABASE_URL=\"$TEST_DATABASE_URL\" drizzle-kit push'",
+    "db:push:test": "node scripts/db-push-test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:integration": "sh -c 'test -n \"$TEST_DATABASE_URL\" || { echo \"TEST_DATABASE_URL is required; refusing to run integration tests\" >&2; exit 1; }; VITEST_INTEGRATION=1 vitest run'"
+    "test:integration": "node scripts/test-integration.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -10,6 +10,8 @@ const envPath = resolve(root, ".env.local");
 const envExamplePath = resolve(root, ".env.example");
 const defaultDatabaseUrl =
   "postgresql://postgres:postgres@localhost:5432/shell";
+const defaultTestDatabaseUrl =
+  "postgresql://postgres:postgres@localhost:5432/shell_test";
 const args = new Set(process.argv.slice(2));
 const skipDependencies = args.has("--skip-dependencies");
 const skipDatabase = args.has("--skip-database");
@@ -82,11 +84,19 @@ async function prepareEnvironment() {
   const databaseUrl = isPlaceholder(values.get("DATABASE_URL"))
     ? defaultDatabaseUrl
     : values.get("DATABASE_URL");
+  const testDatabaseUrl = isPlaceholder(values.get("TEST_DATABASE_URL"))
+    ? defaultTestDatabaseUrl
+    : values.get("TEST_DATABASE_URL");
   const sessionSecret = isPlaceholder(values.get("SESSION_SECRET"))
     ? randomBytes(32).toString("base64url")
     : values.get("SESSION_SECRET");
-  const updated = replaceEnvironmentValue(
+  const withDatabaseUrl = replaceEnvironmentValue(
     replaceEnvironmentValue(source, "DATABASE_URL", databaseUrl),
+    "TEST_DATABASE_URL",
+    testDatabaseUrl,
+  );
+  const updated = replaceEnvironmentValue(
+    withDatabaseUrl,
     "SESSION_SECRET",
     sessionSecret,
   );
@@ -100,8 +110,39 @@ async function prepareEnvironment() {
   return {
     ...process.env,
     DATABASE_URL: databaseUrl,
+    TEST_DATABASE_URL: testDatabaseUrl,
     SESSION_SECRET: sessionSecret,
   };
+}
+
+function queryPostgres(query, environment) {
+  const result = spawnSync(
+    "docker",
+    [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-tAc",
+      query,
+    ],
+    { cwd: root, env: environment, encoding: "utf8" },
+  );
+
+  if (result.error) {
+    throw new Error(`Could not query PostgreSQL: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || "PostgreSQL query failed.");
+  }
+
+  return result.stdout.trim();
 }
 
 const environment = await prepareEnvironment();
@@ -128,6 +169,30 @@ try {
     ],
     environment,
   );
+  if (
+    queryPostgres(
+      "SELECT 1 FROM pg_database WHERE datname = 'shell_test'",
+      environment,
+    ) !== "1"
+  ) {
+    run(
+      "docker",
+      [
+        "compose",
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "postgres",
+        "-c",
+        "CREATE DATABASE shell_test",
+      ],
+      environment,
+    );
+  }
 } catch (error) {
   console.error(
     "PostgreSQL could not start. Start Docker or OrbStack, then rerun npm run setup:local.",
@@ -136,4 +201,7 @@ try {
 }
 
 run("npm", ["run", "db:push"], environment);
-console.log("Local shell setup is complete. Run npm run dev to start the app.");
+run("npm", ["run", "db:push:test"], environment);
+console.log(
+  "Local shell and test setup is complete. Run npm run dev to start the app.",
+);

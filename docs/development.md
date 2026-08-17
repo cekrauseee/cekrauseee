@@ -13,20 +13,21 @@ npm run setup:local
 ```
 
 It installs dependencies, preserves existing `.env.local` values, generates a
-session secret if needed, starts PostgreSQL, and pushes the schema. Docker or
-OrbStack must be running. The database persists in the local `shell-postgres`
-Docker volume.
+session secret if needed, starts PostgreSQL, creates the separate `shell_test`
+database, and pushes both schemas. Docker or OrbStack must be running. The
+databases persist in the local `shell-postgres` Docker volume.
 
 `setup:local` writes these environment names to `.env.local`; values are
 secrets or private connection details and must not be committed:
 
-| Name             | Purpose                                                   |
-| ---------------- | --------------------------------------------------------- |
-| `DATABASE_URL`   | PostgreSQL/Neon connection used by Server Actions         |
-| `SESSION_SECRET` | At least 32 characters for signing anonymous session JWTs |
+| Name                | Purpose                                                   |
+| ------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`      | PostgreSQL/Neon connection used by Server Actions         |
+| `TEST_DATABASE_URL` | Disposable PostgreSQL database used by integration tests  |
+| `SESSION_SECRET`    | At least 32 characters for signing anonymous session JWTs |
 
-Integration tests use a separate `TEST_DATABASE_URL` only. Point it at a
-disposable local database; do not copy a production URL or rely on `.env.local`.
+Integration tests use `TEST_DATABASE_URL` only. The local setup configures it
+as `shell_test`; do not point it at a production or development database.
 
 Use `npm run setup:local -- --skip-database` when dependencies and environment
 setup are needed but PostgreSQL will be supplied separately. Use
