@@ -1,6 +1,6 @@
-# cekrauseee
+# shell
 
-A terminal-style AI chat shell built with Next.js and the OpenAI Responses API. It is the foundation for a future conversational portfolio; the current assistant has no personal knowledge about cekrauseee.
+An interactive AI chat shell built with Next.js and the OpenAI Responses API.
 
 ## Prerequisites
 

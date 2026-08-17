@@ -9,8 +9,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "cekrauseee — conversational shell",
-  description: "A minimal conversational shell.",
+  title: "shell",
+  description: "An interactive shell.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
