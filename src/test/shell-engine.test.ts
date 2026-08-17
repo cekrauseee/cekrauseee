@@ -249,6 +249,19 @@ describe("persistent synchronous shell engine", () => {
     });
     expect(unsupported.exitCode).toBe(2);
     expect(unsupported.state.snapshot?.lastExitCode).toBe(2);
+    const processSubstitution = await executeShellEngine({
+      command: "cat <(printf hi)",
+      cwd: WORKSPACE_ROOT,
+      nodes: [root],
+      history: [],
+      state: emptyShellState,
+    });
+    expect(processSubstitution).toMatchObject({
+      stdout: "",
+      stderr:
+        "bash: process substitutions: not supported in this virtual shell\n",
+      exitCode: 2,
+    });
     const afterUnsupported = await executeShellEngine({
       command: 'printf "%s\\n" "$?"',
       cwd: WORKSPACE_ROOT,

@@ -174,12 +174,32 @@ describe("workspace filesystem persistence", () => {
     expect(getUnsupportedShellFeature("true && wait")).toBe("wait");
     expect(getUnsupportedShellFeature("false || jobs")).toBe("jobs");
     expect(getUnsupportedShellFeature("if true; then kill 1; fi")).toBe("kill");
+    expect(getUnsupportedShellFeature("cat <(printf hi)")).toBe(
+      "process substitutions",
+    );
+    expect(getUnsupportedShellFeature("cat >(printf hi)")).toBe(
+      "process substitutions",
+    );
+    expect(getUnsupportedShellFeature("cat < <(printf hi)")).toBe(
+      "process substitutions",
+    );
+    expect(getUnsupportedShellFeature("cat <(cat <(printf hi))")).toBe(
+      "process substitutions",
+    );
+    expect(getUnsupportedShellFeature("cat >(cat >(printf hi))")).toBe(
+      "process substitutions",
+    );
+    expect(getUnsupportedShellFeature('echo "$(cat <(printf hi))"')).toBe(
+      "process substitutions",
+    );
     expect(getUnsupportedShellFeature("fc -l")).toBeNull();
     expect(getUnsupportedShellFeature("umask 077")).toBeNull();
     expect(getUnsupportedShellFeature("ulimit -f")).toBeNull();
     expect(getUnsupportedShellFeature("cat <&0")).toBeNull();
     expect(getUnsupportedShellFeature('echo "$(wait)"')).toBe("wait");
     expect(getUnsupportedShellFeature("echo 'wait jobs'")).toBeNull();
+    expect(getUnsupportedShellFeature('echo "<(printf hi)"')).toBeNull();
+    expect(getUnsupportedShellFeature("echo '<(printf hi)'")).toBeNull();
     expect(getUnsupportedShellFeature("echo wait # jobs")).toBeNull();
   });
 

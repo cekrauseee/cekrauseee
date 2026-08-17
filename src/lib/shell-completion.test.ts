@@ -27,6 +27,12 @@ describe("getShellCompletion", () => {
     ).not.toContain("wait");
   });
 
+  it("advertises the synchronous fc builtin", () => {
+    expect(
+      getShellCompletion("f", 1, "/workspace", nodes).candidates,
+    ).toContain("fc");
+  });
+
   it("returns files and directories from the current workspace path", () => {
     expect(getShellCompletion("cat re", 6, "/workspace", nodes)).toEqual({
       start: 4,

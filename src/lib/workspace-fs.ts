@@ -314,6 +314,9 @@ export function getUnsupportedShellFeature(command: string) {
       }
       const node = value as Record<string, unknown>;
       if (node.background === true) return "background jobs";
+      if (node.type === "ProcessSubstitution") {
+        return "process substitutions";
+      }
       if (node.type === "SimpleCommand") {
         const name = literalCommandName(node.name);
         if (name && unsupportedJobControlCommands.has(name)) return name;

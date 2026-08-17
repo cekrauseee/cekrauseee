@@ -29,6 +29,7 @@ const shellBuiltins = [
   "eval",
   "exec",
   "exit",
+  "fc",
   "export",
   "false",
   "getopts",
