@@ -48,6 +48,11 @@ export const workspaces = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull().default("default"),
     cwd: text("cwd").notNull().default("/workspace"),
+    shellState: text("shell_state")
+      .notNull()
+      .default(
+        '{"version":1,"engineVersion":"just-bash@3.3.0","unsupportedFeatures":["process-substitutions","signals","async-job-control"],"snapshot":null}',
+      ),
     revision: integer("revision").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

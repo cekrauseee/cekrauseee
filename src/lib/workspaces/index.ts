@@ -6,9 +6,11 @@ import type { Database } from "@/lib/db";
 import { transcripts, workspaceNodes, workspaces } from "@/lib/db/schema";
 import {
   WORKSPACE_ROOT,
+  type PersistedShellState,
   type PersistedNode,
   type PersistedNodeKind,
 } from "@/lib/workspace-fs";
+import { validateShellState } from "@/lib/shell-state";
 
 export const MAX_HISTORY_ENTRIES = 200;
 
@@ -144,6 +146,7 @@ export async function replaceWorkspace(
   workspaceId: string,
   nodes: PersistedNode[],
   cwd: string,
+  shellState: PersistedShellState,
   revision: number,
   transcript: {
     requestId: string;
@@ -153,6 +156,9 @@ export async function replaceWorkspace(
     exitCode: number;
   },
 ) {
+  if (!validateShellState(shellState)) {
+    throw new Error("invalid shell state");
+  }
   await tx
     .delete(workspaceNodes)
     .where(eq(workspaceNodes.workspaceId, workspaceId));
@@ -184,6 +190,11 @@ export async function replaceWorkspace(
   await pruneWorkspaceHistory(tx, workspaceId);
   await tx
     .update(workspaces)
-    .set({ cwd, revision, updatedAt: new Date() })
+    .set({
+      cwd,
+      shellState: JSON.stringify(shellState),
+      revision,
+      updatedAt: new Date(),
+    })
     .where(eq(workspaces.id, workspaceId));
 }

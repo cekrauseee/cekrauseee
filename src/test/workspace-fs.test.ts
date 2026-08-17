@@ -13,6 +13,7 @@ import {
   WORKSPACE_ROOT,
   type PersistedNode,
 } from "@/lib/workspace-fs";
+import { restoreShellState, snapshotShellState } from "@/lib/shell-state";
 
 const root: PersistedNode = {
   path: WORKSPACE_ROOT,
@@ -141,7 +142,7 @@ describe("workspace filesystem persistence", () => {
       stderr: "",
       exitCode: 0,
     });
-    for (const command of ["jobs", "kill", "fc"]) {
+    for (const command of ["jobs", "kill"]) {
       await expect(bash.exec(command)).resolves.toMatchObject({
         stdout: "",
         stderr: `bash: ${command}: job control is not supported in this virtual shell\n`,
@@ -161,6 +162,7 @@ describe("workspace filesystem persistence", () => {
     expect(containsBackgroundOperator("echo hi # &")).toBe(false);
     expect(containsBackgroundOperator("echo hi # &\nsleep 1 &")).toBe(true);
     expect(containsBackgroundOperator("echo hi &> output.txt")).toBe(false);
+    expect(containsBackgroundOperator("cat <&0")).toBe(false);
   });
 
   it("rejects every unsupported job-control command before execution", () => {
@@ -169,6 +171,37 @@ describe("workspace filesystem persistence", () => {
     expect(getUnsupportedShellFeature("echo wait")).toBeNull();
     expect(getUnsupportedShellFeature("echo '&' && echo done")).toBeNull();
     expect(getUnsupportedShellFeature("sleep 1 &")).toBe("background jobs");
+    expect(getUnsupportedShellFeature("true && wait")).toBe("wait");
+    expect(getUnsupportedShellFeature("false || jobs")).toBe("jobs");
+    expect(getUnsupportedShellFeature("if true; then kill 1; fi")).toBe("kill");
+    expect(getUnsupportedShellFeature("fc -l")).toBeNull();
+    expect(getUnsupportedShellFeature("umask 077")).toBeNull();
+    expect(getUnsupportedShellFeature("ulimit -f")).toBeNull();
+    expect(getUnsupportedShellFeature("cat <&0")).toBeNull();
+    expect(getUnsupportedShellFeature('echo "$(wait)"')).toBe("wait");
+    expect(getUnsupportedShellFeature("echo 'wait jobs'")).toBeNull();
+    expect(getUnsupportedShellFeature("echo wait # jobs")).toBeNull();
+  });
+
+  it("restores synchronous shell state across fresh Bash instances", async () => {
+    const fs = await restoreWorkspace([root]);
+    const first = createBash(fs, WORKSPACE_ROOT);
+    await first.exec(
+      "export MESSAGE='persistent value'; set -o nounset; shopt -s dotglob; mkdir -p /workspace/next; pushd /workspace/next >/dev/null",
+    );
+    const state = snapshotShellState(first);
+
+    const second = createBash(fs, first.getCwd());
+    restoreShellState(second, state);
+    const secondResult = await second.exec(
+      'printf "<%s>\\n" "$MESSAGE"; set -o | grep nounset',
+    );
+
+    expect(secondResult).toMatchObject({
+      stdout: "<persistent value>\nnounset         on\n",
+      stderr: "",
+      exitCode: 0,
+    });
   });
 
   it("does not advertise a command that resolves as not found", async () => {
@@ -176,10 +209,22 @@ describe("workspace filesystem persistence", () => {
     const bash = createBash(fs, WORKSPACE_ROOT);
 
     for (const command of shellCommandNames) {
+      // These are provided by the session-state fork and are covered by the
+      // focused support test below; the audit loop also runs against release
+      // tarballs that predate those builtins.
+      if (["fc", "ulimit", "umask"].includes(command)) continue;
       const result = await bash.exec(command);
       expect(result.stderr).not.toContain(
         `bash: ${command}: command not found`,
       );
     }
+  });
+
+  it("executes fork-provided synchronous builtins", async () => {
+    const fs = await restoreWorkspace([root]);
+    const bash = createBash(fs, WORKSPACE_ROOT);
+    expect((await bash.exec("umask 0077; umask")).stdout).toBe("0077\n");
+    expect((await bash.exec("ulimit -f 12; ulimit -f")).stdout).toBe("12\n");
+    expect((await bash.exec("fc -l 1 2")).exitCode).toBe(0);
   });
 });

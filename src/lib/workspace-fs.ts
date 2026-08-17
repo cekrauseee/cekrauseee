@@ -10,6 +10,11 @@ import {
   InMemoryFs,
   type IFileSystem,
 } from "just-bash/browser";
+export {
+  emptyShellState,
+  parseShellState,
+  type PersistedShellState,
+} from "@/lib/shell-state";
 
 export const WORKSPACE_ROOT = "/workspace";
 export const MAX_NODE_COUNT = 2_000;
@@ -200,14 +205,6 @@ function unavailableJobControlCommand(name: string) {
   }));
 }
 
-function unavailableShellFeatureCommand(name: string) {
-  return defineCommand(name, async () => ({
-    stdout: "",
-    stderr: `bash: ${name}: not supported in this virtual shell\n`,
-    exitCode: 2,
-  }));
-}
-
 function logoutCommand() {
   return defineCommand("logout", async () => ({
     stdout: "",
@@ -278,7 +275,13 @@ export function containsBackgroundOperator(command: string) {
 
     const previous = command[index - 1];
     const next = command[index + 1];
-    if (previous !== "&" && next !== "&" && previous !== ">" && next !== ">") {
+    if (
+      previous !== "&" &&
+      next !== "&" &&
+      previous !== ">" &&
+      next !== ">" &&
+      previous !== "<"
+    ) {
       return true;
     }
   }
@@ -286,79 +289,77 @@ export function containsBackgroundOperator(command: string) {
   return false;
 }
 
-const unsupportedJobControlCommands = new Set(["fc", "jobs", "kill", "wait"]);
+const unsupportedJobControlCommands = new Set(["jobs", "kill", "wait"]);
 
 export function getUnsupportedShellFeature(command: string) {
-  if (containsBackgroundOperator(command)) return "background jobs";
-
-  let quote: "single" | "double" | null = null;
-  let escaped = false;
-  let commandStart = true;
-  let word = "";
-
-  const inspectWord = () => {
-    if (!word) return null;
-    const currentWord = word;
-    word = "";
-
-    if (!commandStart) return null;
-    if (/^[a-zA-Z_][a-zA-Z0-9_]*=/.test(currentWord)) return null;
-    commandStart = false;
-    return unsupportedJobControlCommands.has(currentWord) ? currentWord : null;
-  };
-
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command[index];
-
-    if (escaped) {
-      word += character;
-      escaped = false;
-      continue;
-    }
-    if (character === "\\" && quote !== "single") {
-      escaped = true;
-      continue;
-    }
-    if (character === "'" && quote !== "double") {
-      quote = quote === "single" ? null : "single";
-      continue;
-    }
-    if (character === '"' && quote !== "single") {
-      quote = quote === "double" ? null : "double";
-      continue;
-    }
-    if (quote) {
-      word += character;
-      continue;
-    }
-
-    if (
-      character === "#" &&
-      !word &&
-      (index === 0 || /\s/.test(command[index - 1] ?? ""))
-    ) {
-      const nextLine = command.indexOf("\n", index);
-      if (nextLine === -1) return null;
-      index = nextLine;
-      commandStart = true;
-      continue;
-    }
-    if (/\s/.test(character)) {
-      const unsupported = inspectWord();
-      if (unsupported) return unsupported;
-      continue;
-    }
-    if (character === ";" || character === "|" || character === "\n") {
-      const unsupported = inspectWord();
-      if (unsupported) return unsupported;
-      commandStart = true;
-      continue;
-    }
-
-    word += character;
+  try {
+    // Bash.transform uses just-bash's real lexer/parser, so command names in
+    // &&/|| chains, control structures, functions, and substitutions are all
+    // visited without treating quoted arguments or comments as commands.
+    const parser = new Bash({
+      cwd: WORKSPACE_ROOT,
+      python: false,
+      javascript: false,
+      defenseInDepth: { enabled: false },
+    });
+    const ast = parser.transform(command).ast as unknown;
+    const visit = (value: unknown): string | null => {
+      if (!value || typeof value !== "object") return null;
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          const result = visit(item);
+          if (result) return result;
+        }
+        return null;
+      }
+      const node = value as Record<string, unknown>;
+      if (node.background === true) return "background jobs";
+      if (node.type === "SimpleCommand") {
+        const name = literalCommandName(node.name);
+        if (name && unsupportedJobControlCommands.has(name)) return name;
+      }
+      for (const child of Object.values(node)) {
+        const result = visit(child);
+        if (result) return result;
+      }
+      return null;
+    };
+    const unsupported = visit(ast);
+    if (unsupported) return unsupported;
+    if (containsBackgroundOperator(command)) return "background jobs";
+    return null;
+  } catch {
+    // Let just-bash produce its normal syntax error for malformed input.
+    return null;
   }
+}
 
-  return inspectWord();
+function literalCommandName(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const parts = (value as { parts?: unknown }).parts;
+  if (!Array.isArray(parts)) return null;
+  let result = "";
+  for (const part of parts) {
+    if (!part || typeof part !== "object") return null;
+    const node = part as { type?: unknown; value?: unknown; parts?: unknown };
+    if (
+      (node.type === "Literal" ||
+        node.type === "SingleQuoted" ||
+        node.type === "Escaped") &&
+      typeof node.value === "string"
+    ) {
+      result += node.value;
+      continue;
+    }
+    if (node.type === "DoubleQuoted" && Array.isArray(node.parts)) {
+      const nested = literalCommandName({ parts: node.parts });
+      if (nested === null) return null;
+      result += nested;
+      continue;
+    }
+    return null;
+  }
+  return result || null;
 }
 
 export function createBash(
@@ -366,9 +367,11 @@ export function createBash(
   cwd: string,
   history: ShellHistoryCommand[] = [],
 ) {
+  if (typeof cwd !== "string") cwd = WORKSPACE_ROOT;
   const safeCwd =
-    cwd === WORKSPACE_ROOT || cwd.startsWith(`${WORKSPACE_ROOT}/`)
-      ? cwd
+    posix.normalize(cwd) === WORKSPACE_ROOT ||
+    posix.normalize(cwd).startsWith(`${WORKSPACE_ROOT}/`)
+      ? posix.normalize(cwd)
       : WORKSPACE_ROOT;
   return new Bash({
     fs,
@@ -382,11 +385,9 @@ export function createBash(
       unavailableJobControlCommand("jobs"),
       unavailableJobControlCommand("wait"),
       unavailableJobControlCommand("kill"),
-      unavailableJobControlCommand("fc"),
-      unavailableShellFeatureCommand("ulimit"),
-      unavailableShellFeatureCommand("umask"),
       logoutCommand(),
     ],
+    sessionState: true,
     executionLimits: {
       maxExecutionTimeMs: 3_000,
       maxCommandCount: 500,

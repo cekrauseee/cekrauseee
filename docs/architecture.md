@@ -23,6 +23,13 @@ for one workspace; the transcript request ID supplies an idempotency boundary.
 - `src/lib/db/` defines the Drizzle schema and lazy PostgreSQL/Neon drivers.
 - `src/lib/workspace-fs.ts` validates, hydrates, snapshots, and quotas virtual
   workspace nodes.
+- `src/lib/shell-state.ts` validates, bounds, and serializes the versioned
+  interpreter snapshot before it crosses the database boundary.
+- `src/lib/shell-engine.ts` restores the virtual filesystem and interpreter
+  state, executes one synchronous command, and produces the next snapshot.
+- `src/features/shell/transaction.ts` serializes one workspace command and
+  commits filesystem, interpreter state, cwd, transcript, and revision
+  atomically.
 - `src/lib/workspaces/` reads and transactionally replaces workspace records.
 - `src/test/` contains database-free unit/component tests plus an explicitly
   gated local-Postgres persistence test.
@@ -34,7 +41,8 @@ for one workspace; the transcript request ID supplies an idempotency boundary.
 2. The client submits each command with a unique request ID to
    `executeShellCommand`.
 3. The action validates the command, hydrates the virtual filesystem, executes
-   it with `just-bash`, and persists the snapshot, cwd, and transcript.
+   it with `just-bash`, and persists the filesystem and interpreter snapshots,
+   cwd, and transcript in one transaction.
 4. The client renders plain command output or an accessible error.
 
 ## Invariants and unavailable features
@@ -42,7 +50,10 @@ for one workspace; the transcript request ID supplies an idempotency boundary.
 - `DATABASE_URL` and `SESSION_SECRET` are server-only configuration; no
   secret is sent to the browser.
 - Workspace paths must remain under `/workspace`; node count, file size,
-  command input, and command output are bounded.
+  command input, command output, descriptor state, resource-limit state, and
+  command history are bounded.
+- Background execution, job control, signals, process substitution, and all
+  asynchronous execution are rejected before interpreter execution.
 - There is no host filesystem access, arbitrary network access, Python or
   JavaScript command execution, account/profile UI, billing, rate limiting, or
   usage quota enforcement yet.

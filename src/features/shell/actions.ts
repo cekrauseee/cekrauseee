@@ -1,25 +1,19 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { posix } from "node:path";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireAnonymousSession } from "@/lib/auth/session";
-import { getDb, type Database } from "@/lib/db";
-import { transcripts, workspaceNodes, workspaces } from "@/lib/db/schema";
-import {
-  getUnsupportedShellFeature,
-  MAX_COMMAND_BYTES,
-  createBash,
-  restoreWorkspace,
-  snapshotWorkspace,
-  WORKSPACE_ROOT,
-} from "@/lib/workspace-fs";
+import { getDb } from "@/lib/db";
+import { workspaces } from "@/lib/db/schema";
+import { MAX_COMMAND_BYTES, WORKSPACE_ROOT } from "@/lib/workspace-fs";
 import {
   clearWorkspaceHistory,
   ensureWorkspaceRoot,
   readWorkspace,
-  replaceWorkspace,
 } from "@/lib/workspaces";
+import { executeInTransaction } from "@/features/shell/transaction";
 import {
   getShellCompletion,
   type ShellCompletion,
@@ -88,8 +82,11 @@ function unavailable(error = "The shell is temporarily unavailable.") {
 }
 
 function safeCwd(cwd: string) {
-  return cwd === WORKSPACE_ROOT || cwd.startsWith(`${WORKSPACE_ROOT}/`)
-    ? cwd
+  if (typeof cwd !== "string") return WORKSPACE_ROOT;
+  const normalized = posix.normalize(cwd);
+  return normalized === WORKSPACE_ROOT ||
+    normalized.startsWith(`${WORKSPACE_ROOT}/`)
+    ? normalized
     : WORKSPACE_ROOT;
 }
 
@@ -171,111 +168,6 @@ export async function clearShellHistory(): Promise<ClearShellHistoryResult> {
   } catch {
     return unavailable();
   }
-}
-
-type TransactionResult =
-  | (ShellHistoryEntry & { cwd: string; revision: number })
-  | { conflict: true; error: string }
-  | { unavailable: true };
-
-async function executeInTransaction(
-  db: Database,
-  workspaceId: string,
-  command: string,
-  requestId: string,
-): Promise<TransactionResult> {
-  return db.transaction(async (tx) => {
-    // Serialize commands for one workspace. This also makes the unique
-    // requestId transcript row a reliable idempotency boundary.
-    const workspaceRows = await tx
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.id, workspaceId))
-      .for("update")
-      .limit(1);
-    const workspace = workspaceRows[0];
-    if (!workspace) return { unavailable: true };
-
-    const previousRows = await tx
-      .select()
-      .from(transcripts)
-      .where(
-        and(
-          eq(transcripts.workspaceId, workspaceId),
-          eq(transcripts.requestId, requestId),
-        ),
-      )
-      .limit(1);
-    const previous = previousRows[0];
-    if (previous) {
-      if (previous.command !== command) {
-        return {
-          conflict: true,
-          error: "This request ID was already used for another command.",
-        };
-      }
-      return {
-        command: previous.command,
-        stdout: previous.stdout,
-        stderr: previous.stderr,
-        exitCode: previous.exitCode,
-        cwd: previous.cwd,
-        revision: previous.revision,
-      };
-    }
-
-    const nodeRows = await tx
-      .select()
-      .from(workspaceNodes)
-      .where(eq(workspaceNodes.workspaceId, workspaceId));
-    const historyRows = await tx
-      .select({ command: transcripts.command })
-      .from(transcripts)
-      .where(eq(transcripts.workspaceId, workspaceId))
-      .orderBy(transcripts.createdAt, transcripts.id);
-    const fs = await restoreWorkspace(
-      nodeRows.map((node) => ({
-        path: node.path,
-        kind: node.kind as "file" | "directory" | "symlink",
-        mode: node.mode,
-        contentBase64: node.content ?? undefined,
-        target: node.target ?? undefined,
-        sizeBytes: node.sizeBytes,
-      })),
-    );
-    const bash = createBash(fs, safeCwd(workspace.cwd), historyRows);
-    const unsupportedFeature = getUnsupportedShellFeature(command);
-    const execution = unsupportedFeature
-      ? {
-          stdout: "",
-          stderr: `bash: ${unsupportedFeature}: not supported in this virtual shell\n`,
-          exitCode: 2,
-          env: { PWD: safeCwd(workspace.cwd) },
-        }
-      : await bash.exec(command);
-    // just-bash restores its host execution state after exec(); the final
-    // shell PWD is returned in the serializable environment instead.
-    const cwd = safeCwd(execution.env?.PWD ?? bash.getCwd());
-    const nodes = await snapshotWorkspace(fs);
-    const revision = workspace.revision + 1;
-
-    await replaceWorkspace(tx, workspaceId, nodes, cwd, revision, {
-      requestId,
-      command,
-      stdout: execution.stdout,
-      stderr: execution.stderr,
-      exitCode: execution.exitCode,
-    });
-
-    return {
-      command,
-      stdout: execution.stdout,
-      stderr: execution.stderr,
-      exitCode: execution.exitCode,
-      cwd,
-      revision,
-    };
-  });
 }
 
 export async function executeShellCommand(input: {
