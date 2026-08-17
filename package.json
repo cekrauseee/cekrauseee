@@ -21,7 +21,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.9",
-    "just-bash": "https://github.com/cekrauseee/just-bash/releases/download/session-state-v2/just-bash-3.3.0.tgz",
+    "just-bash": "https://github.com/cekrauseee/just-bash/releases/download/session-state-v3/just-bash-3.3.0.tgz",
     "next": "16.3.1",
     "pg": "^8.23.0",
     "react": "19.2.8",
