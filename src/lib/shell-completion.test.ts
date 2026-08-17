@@ -1,3 +1,4 @@
+import { getCommandNames } from "just-bash/browser";
 import { describe, expect, it } from "vitest";
 
 import { getShellCompletion } from "@/lib/shell-completion";
@@ -25,6 +26,28 @@ describe("getShellCompletion", () => {
     expect(
       getShellCompletion("wa", 2, "/workspace", nodes).candidates,
     ).not.toContain("wait");
+  });
+
+  it("advertises every browser executable except unavailable utilities", () => {
+    const unavailable = ["tar", "yq", "xan", "sqlite3"];
+    const candidates = getShellCompletion(
+      "",
+      0,
+      "/workspace",
+      nodes,
+    ).candidates;
+
+    for (const name of getCommandNames()) {
+      if (unavailable.includes(name)) {
+        expect(candidates).not.toContain(name);
+      } else {
+        expect(candidates).toContain(name);
+      }
+    }
+
+    for (const name of unavailable) {
+      expect(candidates).not.toContain(name);
+    }
   });
 
   it("advertises the synchronous fc builtin", () => {

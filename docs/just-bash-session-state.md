@@ -42,6 +42,12 @@ and all asynchronous execution remain outside the runtime contract. The
 interactive editor workflow of `fc` is also excluded; the virtual builtin
 supports synchronous listing, ranges, reversal, and `-s` substitution.
 
+The browser command registry also includes `tar`, `yq`, `xan`, and `sqlite3`,
+but these utilities are unavailable in the app's browser execution bundle.
+They are therefore excluded from completion and from the executable command
+contract. Other names returned by the browser registry remain advertised,
+including the synchronous `fc` builtin.
+
 ## Release integration status
 
 `package.json` and `package-lock.json` resolve the published

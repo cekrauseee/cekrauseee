@@ -13,6 +13,7 @@ export type ShellCompletion = {
 };
 
 const workspaceRoot = "/workspace";
+const browserUnavailableCommands = new Set(["tar", "yq", "xan", "sqlite3"]);
 const shellBuiltins = [
   ".",
   ":",
@@ -58,7 +59,11 @@ const shellBuiltins = [
   "unset",
 ];
 export const shellCommandNames = [
-  ...new Set([...getCommandNames(), ...shellBuiltins]),
+  ...new Set(
+    [...getCommandNames(), ...shellBuiltins].filter(
+      (name) => !browserUnavailableCommands.has(name),
+    ),
+  ),
 ].sort((left, right) => left.localeCompare(right));
 
 function isWorkspacePath(path: string) {

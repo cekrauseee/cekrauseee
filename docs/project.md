@@ -29,6 +29,10 @@ excludes only `fc`'s interactive editor workflow. Background execution,
 `jobs`, `wait`, `kill`, signals, process substitutions, and all asynchronous
 execution are intentionally outside the app's virtual shell contract.
 
+The browser bundle reports four utilities that are not executable in this app:
+`tar`, `yq`, `xan`, and `sqlite3`. They are excluded from command completion and
+are outside the app command contract.
+
 ## User and data boundaries
 
 The browser displays the active transcript. Anonymous signed sessions,
