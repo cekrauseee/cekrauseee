@@ -15,7 +15,9 @@ if (!process.env.TEST_DATABASE_URL) {
 
 const result = spawnSync(
   process.execPath,
-  ["node_modules/drizzle-kit/bin.cjs", "push"],
+  // The target is the disposable TEST_DATABASE_URL. CI has no TTY, so approve
+  // the schema creation explicitly rather than leaving Drizzle at its prompt.
+  ["node_modules/drizzle-kit/bin.cjs", "push", "--force"],
   {
     cwd: root,
     env: { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL },
