@@ -5,7 +5,7 @@ small and behavior-focused:
 
 - `workspace-fs.test.ts` exercises persistence hydration, deterministic
   snapshots, symlinks, root requirements, and quota/path/content validation.
-- `chat-shell-actions.test.tsx` mocks the Server Actions and covers bootstrap,
+- `shell-terminal-actions.test.tsx` mocks the Server Actions and covers bootstrap,
   successful command submission, and the preserved terminal UI hierarchy.
 - `integration/workspace-persistence.test.ts` commits a real local-pg Drizzle
   transaction and verifies persisted workspace state.

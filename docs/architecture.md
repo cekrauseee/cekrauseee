@@ -15,7 +15,7 @@ for one workspace; the transcript request ID supplies an idempotency boundary.
 ## Components
 
 - `src/app/` defines the root layout and route.
-- `src/features/chat/components/chat-shell.tsx` preserves the active terminal
+- `src/features/shell/components/shell-terminal.tsx` preserves the active terminal
   UI, keyboard behavior, status announcements, and transcript viewport.
 - `src/features/shell/actions.ts` exposes the initialize and execute Server
   Actions and maps failures to safe user-facing results.

@@ -7,8 +7,8 @@ preserved while its prompt executes commands in a persistent virtual workspace.
 
 ## Current capabilities
 
-The active UI supports multiline commands, persisted prompt history,
-Control/Command+L to clear the visible transcript, and accessible
+The active UI supports multiline commands, persisted prompt history, `clear`
+and Control/Command+L to clear the persisted transcript, and accessible
 pending/error announcements. Commands run with `just-bash` against an isolated
 filesystem and are persisted with the current working directory and transcript.
 

@@ -5,7 +5,11 @@ import { eq } from "drizzle-orm";
 
 import { closeDbForTests, getDb } from "@/lib/db";
 import { users, workspaces } from "@/lib/db/schema";
-import { readWorkspace, replaceWorkspace } from "@/lib/workspaces";
+import {
+  clearWorkspaceHistory,
+  readWorkspace,
+  replaceWorkspace,
+} from "@/lib/workspaces";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (!testDatabaseUrl) {
@@ -88,8 +92,19 @@ describe("workspace persistence over local PostgreSQL", () => {
         stdout: "hello",
         stderr: "",
         exitCode: 0,
+        cwd: "/workspace/projects",
       },
     ]);
+
+    await db.transaction((tx) => clearWorkspaceHistory(tx, workspaceId));
+
+    const clearedState = await readWorkspace(db, workspaceId);
+    expect(clearedState?.workspace).toMatchObject({
+      cwd: "/workspace/projects",
+      revision: 1,
+    });
+    expect(clearedState?.nodes).toEqual(state?.nodes);
+    expect(clearedState?.history).toEqual([]);
   });
 
   afterAll(async () => {

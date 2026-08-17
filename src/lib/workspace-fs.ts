@@ -25,9 +25,8 @@ export type PersistedNode = {
 
 function isWorkspacePath(value: string) {
   return (
-    value === WORKSPACE_ROOT ||
-    value.startsWith(`${WORKSPACE_ROOT}/`) ||
-    !value.includes("\0")
+    !value.includes("\0") &&
+    (value === WORKSPACE_ROOT || value.startsWith(`${WORKSPACE_ROOT}/`))
   );
 }
 

@@ -14,10 +14,15 @@ import {
   WORKSPACE_ROOT,
 } from "@/lib/workspace-fs";
 import {
+  clearWorkspaceHistory,
   ensureWorkspaceRoot,
   readWorkspace,
   replaceWorkspace,
 } from "@/lib/workspaces";
+import {
+  getShellCompletion,
+  type ShellCompletion,
+} from "@/lib/shell-completion";
 
 const executeInputSchema = z.object({
   command: z.string().min(1).max(MAX_COMMAND_BYTES),
@@ -28,11 +33,17 @@ const executeInputSchema = z.object({
     .regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
+const completionInputSchema = z.object({
+  input: z.string().max(MAX_COMMAND_BYTES),
+  cursor: z.number().int().min(0).max(MAX_COMMAND_BYTES),
+});
+
 export type ShellHistoryEntry = {
   command: string;
   stdout: string;
   stderr: string;
   exitCode: number;
+  cwd: string;
 };
 
 export type InitializeShellResult =
@@ -59,6 +70,17 @@ export type ExecuteShellCommandResult =
       error: string;
       code?: "conflict" | "validation" | "unavailable";
     };
+
+export type CompleteShellInputResult =
+  | { ok: true; completion: ShellCompletion }
+  | {
+      ok: false;
+      error: string;
+      code?: "validation" | "unavailable";
+    };
+
+export type ClearShellHistoryResult =
+  { ok: true } | { ok: false; error: string; code?: "unavailable" };
 
 function unavailable(error = "The shell is temporarily unavailable.") {
   return { ok: false as const, error, code: "unavailable" as const };
@@ -89,6 +111,64 @@ export async function initializeShell(): Promise<InitializeShellResult> {
     };
   } catch {
     return { ok: false, error: "Unable to initialize the shell right now." };
+  }
+}
+
+export async function completeShellInput(input: {
+  input: string;
+  cursor: number;
+}): Promise<CompleteShellInputResult> {
+  const parsed = completionInputSchema.safeParse(input);
+  if (!parsed.success || parsed.data.cursor > parsed.data.input.length) {
+    return {
+      ok: false,
+      error: "Completion input is invalid.",
+      code: "validation",
+    };
+  }
+
+  try {
+    const session = await requireAnonymousSession();
+    const db = getDb();
+    await ensureWorkspaceRoot(db, session.workspaceId);
+    const state = await readWorkspace(db, session.workspaceId);
+    if (!state) return unavailable("The shell workspace was not found.");
+
+    return {
+      ok: true,
+      completion: getShellCompletion(
+        parsed.data.input,
+        parsed.data.cursor,
+        safeCwd(state.workspace.cwd),
+        state.nodes,
+      ),
+    };
+  } catch {
+    return unavailable();
+  }
+}
+
+export async function clearShellHistory(): Promise<ClearShellHistoryResult> {
+  try {
+    const session = await requireAnonymousSession();
+    const db = getDb();
+    const cleared = await db.transaction(async (tx) => {
+      const workspaceRows = await tx
+        .select({ id: workspaces.id })
+        .from(workspaces)
+        .where(eq(workspaces.id, session.workspaceId))
+        .for("update")
+        .limit(1);
+      if (!workspaceRows[0]) return false;
+
+      await clearWorkspaceHistory(tx, session.workspaceId);
+      return true;
+    });
+
+    if (!cleared) return unavailable("The shell workspace was not found.");
+    return { ok: true };
+  } catch {
+    return unavailable();
   }
 }
 

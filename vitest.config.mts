@@ -19,7 +19,7 @@ export default defineConfig({
     environment: integration ? "node" : "jsdom",
     include: integration
       ? ["src/test/integration/**/*.test.ts"]
-      : ["src/test/**/*.test.{ts,tsx}"],
+      : ["src/**/*.test.{ts,tsx}"],
     exclude: integration ? [] : ["src/test/integration/**"],
     setupFiles: integration ? [] : ["./src/test/setup.ts"],
     clearMocks: true,

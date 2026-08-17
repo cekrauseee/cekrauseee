@@ -81,7 +81,7 @@ Postgres service and never supplies production database credentials.
 
 Read [Testing](testing.md) before adding coverage. For visual behavior, also
 verify the active workspace UI manually in a browser: multiline commands,
-persisted prompt history, Control/Command+L clearing only the visible
+persisted prompt history, `clear` and Control/Command+L clearing the persisted
 transcript, command output, and error states.
 
 ## Conventions

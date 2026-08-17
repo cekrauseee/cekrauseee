@@ -74,6 +74,19 @@ describe("workspace filesystem persistence", () => {
       ]),
     ).toThrow("workspace path escapes its root");
 
+    expect(() =>
+      assertWorkspaceQuota([
+        root,
+        {
+          path: `${WORKSPACE_ROOT}/\0`,
+          kind: "file",
+          mode: 0o644,
+          contentBase64: "",
+          sizeBytes: 0,
+        },
+      ]),
+    ).toThrow("invalid workspace node path");
+
     expect(() => assertWorkspaceQuota([root, root])).toThrow(
       "duplicate workspace path",
     );

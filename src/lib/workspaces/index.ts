@@ -25,6 +25,7 @@ export type WorkspaceState = {
     stdout: string;
     stderr: string;
     exitCode: number;
+    cwd: string;
   }>;
 };
 
@@ -75,6 +76,7 @@ export async function readWorkspace(
       stdout: entry.stdout,
       stderr: entry.stderr,
       exitCode: entry.exitCode,
+      cwd: entry.cwd,
     })),
   };
 }
@@ -128,6 +130,13 @@ async function pruneWorkspaceHistory(
       ),
     ),
   );
+}
+
+export async function clearWorkspaceHistory(
+  tx: WorkspaceWriteExecutor,
+  workspaceId: string,
+) {
+  await tx.delete(transcripts).where(eq(transcripts.workspaceId, workspaceId));
 }
 
 export async function replaceWorkspace(
