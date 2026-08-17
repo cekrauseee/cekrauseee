@@ -2,18 +2,35 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shell_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shell_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/shell_test
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Set up Node.js
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.x
           cache: npm
       - name: Install dependencies
         run: npm ci
@@ -21,5 +38,13 @@ jobs:
         run: npm run format:check
       - name: Lint
         run: npm run lint
-      - name: Type-check
+      - name: Typecheck
         run: npm run typecheck
+      - name: Run tests
+        run: npm run test:run
+      - name: Prepare disposable test schema
+        run: npm run db:push:test
+      - name: Run PostgreSQL integration tests
+        run: npm run test:integration
+      - name: Build
+        run: npm run build

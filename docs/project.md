@@ -2,25 +2,31 @@
 
 ## Purpose
 
-shell is a terminal-inspired interactive AI chat shell. The current model is a generic assistant that replies helpfully in the language of the visitor's latest message.
+shell is a small, terminal-inspired web application for running commands in a
+safe virtual workspace that survives page reloads. It gives each visitor an
+anonymous signed session and a PostgreSQL-backed workspace.
 
-## Scope
+## Current capabilities
 
-The application currently contains one App Router page and one full-screen chat experience. It uses a neutral monochrome palette that follows the system light or dark preference. The empty state shows only the `$` prompt and a custom block cursor; there is no visible onboarding copy or input placeholder.
+The terminal supports common `just-bash` commands, multiline input, prompt
+history, cwd changes, stdout/stderr and exit status, transcript history, clear
+view, accessible pending/error announcements, bounded persistence, and
+restoration after a reload. Commands execute in memory under `/workspace`;
+each successful command advances a workspace revision.
 
-The interface supports multiline prompts, prompt history with the up and down arrow keys, submission with Enter, new lines with Shift+Enter, conversation clearing with Control/Command+L, pending and error states, and accessible status announcements. Clicking outside the textarea focuses the active prompt and moves the caret to its end.
+## Intentionally unavailable
 
-It does not provide accounts, authentication, rate limits, a database, durable conversation history, analytics, or deployment infrastructure.
+There is no host filesystem access, arbitrary network access, Python or
+JavaScript execution, account/profile UI, billing, rate limiting, usage quotas,
+or AI chat behavior on the terminal route. The older chat source remains
+dormant and its `openai` dependency is retained because it still imports the
+client. Unit CI remains database-free; a separate opt-in integration job uses
+only a disposable `TEST_DATABASE_URL`.
 
-## Runtime Behavior
+## User and data boundaries
 
-The browser holds the active messages and prompt history in React state. Each submission sends the complete active conversation to a Next.js Server Action. The action validates the messages and requests a non-streaming response from `gpt-5.6-luna`. Responses render as safe GitHub Flavored Markdown with a word-reveal animation; reduced-motion preferences disable the reveal.
-
-## Boundaries
-
-- Reloading or clearing the page loses the browser-held conversation.
-- The application has no persistence layer.
-- OpenAI requests set `store: false`; the application itself does not save request or response content.
-- The OpenAI API key remains server-side and must be supplied as `OPENAI_API_KEY`.
-- Application-specific knowledge is not implemented yet; do not present generic model answers as facts about shell.
-- The current shell is a development chat experience, not a production-ready public service.
+The browser holds only the active terminal presentation. Server Actions
+authenticate the signed cookie, execute commands, and persist validated
+workspace nodes and bounded transcripts. Clearing the viewport removes visible
+history only; it does not delete the workspace. Reloading restores persisted
+cwd, revision, files, and command history.

@@ -1,35 +1,60 @@
 # Architecture
 
-## Overview
+## System boundaries
 
-The project is a Next.js 16 App Router application. A Client Component owns the interactive terminal state, while a Server Action is the only path to the OpenAI API.
+The project is a Next.js 16 App Router application. The browser owns terminal
+input and transcript presentation. Server Actions own session lookup,
+validation, database transactions, and virtual command execution. PostgreSQL
+stores only the anonymous identity/session records, workspace nodes, cwd and
+revision, and bounded command transcripts.
+
+Commands run through `just-bash` over an in-memory filesystem rooted at
+`/workspace`. The host filesystem and network are not exposed to commands.
+Workspace state is hydrated from validated persisted nodes before each command,
+then snapshotted back into the same transaction. A row lock serializes commands
+for one workspace; the transcript request ID supplies an idempotency boundary.
 
 ## Components
 
-- `src/app/` defines the root layout, metadata, global styling, and the `/` route.
-- `src/features/chat/components/chat-shell.tsx` owns the conversation, composer, keyboard controls, errors, and accessibility announcements.
-- `src/features/chat/components/block-cursor-input.tsx` mirrors the textarea content to draw a caret-aware block cursor while retaining a native textarea for input.
-- `src/features/chat/components/markdown-response.tsx` renders safe GitHub Flavored Markdown and applies the word-reveal presentation. Raw HTML is not enabled, and links opened in a new tab use `noopener` and `noreferrer`.
-- `src/features/chat/hooks/` contains textarea sizing and in-memory prompt history behavior.
-- `src/features/chat/actions.ts` validates messages and calls the OpenAI Responses API from the server.
-- `src/lib/openai.ts` lazily creates and reuses the server-side OpenAI client.
+- `src/app/` defines the root layout and route.
+- `src/features/terminal/components/terminal-shell.tsx` owns the client UI,
+  keyboard behavior, status announcements, and transcript viewport.
+- `src/features/shell/actions.ts` exposes the initialize and execute Server
+  Actions and maps failures to safe user-facing results.
+- `src/lib/auth/session.ts` provisions and verifies anonymous signed sessions.
+- `src/lib/db/` defines the Drizzle schema and lazy PostgreSQL/Neon drivers.
+- `src/lib/workspace-fs.ts` validates, hydrates, snapshots, and quotas virtual
+  workspace nodes.
+- `src/lib/workspaces/` reads and transactionally replaces workspace records.
+- `src/test/` contains database-free unit/component tests plus an explicitly
+  gated local-Postgres persistence test.
 
-## Data Flow
+## Request flow
 
-1. The visitor submits a prompt in the client shell.
-2. The shell appends the user message to its local React state.
-3. The shell passes the complete conversation to the `sendMessage` Server Action.
-4. The action rejects malformed or incorrectly ordered messages.
-5. The action calls `gpt-5.6-luna` with `store: false`, no tools, no streaming, and generic instructions to answer helpfully in the latest message's language.
-6. The action returns plain result data. The client appends a successful answer or presents an error.
-7. The Markdown renderer displays the answer. No application database or filesystem write occurs.
+1. The terminal mounts and calls `initializeShell`.
+2. The action authenticates the `__Host-shell_session` cookie or provisions an
+   anonymous user, session, and default workspace.
+3. The action returns cwd, revision, and bounded transcript history.
+4. A submitted command is validated, then runs inside a database transaction
+   that locks the workspace row.
+5. The action restores the virtual filesystem, executes `just-bash`, snapshots
+   nodes, writes the transcript, advances the revision, and returns output.
+6. The client renders stdout/stderr, exit status, cwd, and an accessible status
+   announcement. Clear view removes only the visible transcript.
 
-## Invariants
+## Invariants and unavailable features
 
-- `OPENAI_API_KEY` is a server-only secret and must never use a `NEXT_PUBLIC_` prefix.
-- Only user and assistant roles cross the Server Action boundary, and the final submitted message must be from the user.
-- The application does not persist conversations; browser state is the current source of truth.
-- OpenAI response storage remains disabled with `store: false`.
-- The current request contains no application-specific context or knowledge source about shell.
-- Clearing the shell invalidates any in-flight response so it cannot repopulate the cleared conversation.
-- Public deployment requires authentication, rate limiting, quotas, or equivalent abuse and cost controls not present in this repository.
+- `DATABASE_URL` and `SESSION_SECRET` are server-only configuration; no
+  secret is sent to the browser.
+- Workspace paths must remain under `/workspace`; node count, file size,
+  command input, and command output are bounded.
+- A terminal reload restores workspace data and bounded command history.
+- Clear view does not delete persisted workspace data.
+- There is no host filesystem access, arbitrary network access, Python or
+  JavaScript command execution, account/profile UI, billing, rate limiting, or
+  usage quota enforcement yet.
+- The dormant chat source still imports `openai`, but the terminal route does
+  not call it and does not provide an AI chat feature.
+- Unit CI tests remain database-free. The separate integration job provisions a
+  disposable Postgres service, pushes the schema explicitly, and uses only
+  `TEST_DATABASE_URL`; no production Neon credentials are needed.
