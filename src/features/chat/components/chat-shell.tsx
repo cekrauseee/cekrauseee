@@ -164,7 +164,7 @@ export function ChatShell() {
         style={{ translate: `0 ${-lineOffset}lh` }}
       >
         <div className="shell__inner">
-          <h1 className="sr-only">cekrauseee conversational shell</h1>
+          <h1 className="sr-only">shell interactive shell</h1>
 
           <ol className="conversation" aria-label="Conversation">
             {messages.map((message, index) => (

@@ -41,12 +41,12 @@ npm run typecheck
 
 There is currently no automated test suite. For behavior changes, also verify the following in a browser:
 
-- The empty full-screen shell follows the system light or dark preference and shows `visitor@cekrauseee:/` with a block cursor, without visible onboarding or placeholder text.
+- The empty full-screen shell follows the system light or dark preference and shows `$` with a block cursor, without visible onboarding or placeholder text.
 - Enter submits, Shift+Enter adds a line, the arrow keys recall prompt history, and Control/Command+L clears the conversation.
 - Clicking outside the textarea focuses the active prompt at its end.
 - Pending and error states are announced, and the custom cursor remains usable for selection and input method composition.
 - Responses reveal word by word, respect reduced-motion preferences, and render Markdown without raw HTML.
-- Answers remain generic and language-aware; personal cekrauseee knowledge is not implemented.
+- Answers remain generic and language-aware; application-specific shell knowledge is not implemented.
 
 ## Conventions
 

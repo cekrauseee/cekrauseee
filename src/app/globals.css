@@ -324,7 +324,6 @@ textarea {
   box-shadow: inset 0 0 0 1px var(--text);
   color: var(--text);
   line-height: 1.25;
-  vertical-align: -0.13em;
   animation: block-cursor-blink 1s steps(1, end) infinite;
 }
 
