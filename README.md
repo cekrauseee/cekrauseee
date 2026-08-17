@@ -13,17 +13,17 @@ commands execute inside `just-bash`, never on the host filesystem.
 ## Setup
 
 ```bash
-npm ci
-cp .env.example .env.local
+npm run setup:local
 ```
 
-Configure `DATABASE_URL` and `SESSION_SECRET` in `.env.local`. Keep both
-values private and never commit `.env.local`.
+The setup command installs dependencies, keeps any existing local values,
+generates `SESSION_SECRET` when necessary, starts the local PostgreSQL service,
+and pushes the Drizzle schema. It requires Docker or OrbStack to be running.
+Keep `.env.local` private and never commit it.
 
-Apply the Drizzle schema to the configured database, then start the app:
+Then start the app:
 
 ```bash
-npm run db:push
 npm run dev
 ```
 

@@ -6,15 +6,19 @@
 - npm
 - PostgreSQL locally, or a compatible Neon database
 
-Install the locked dependency graph and create a local environment file:
+The quickest local setup uses the included PostgreSQL Compose service:
 
 ```bash
-npm ci
-cp .env.example .env.local
+npm run setup:local
 ```
 
-Set these environment names in `.env.local`; values are secrets or private
-connection details and must not be committed:
+It installs dependencies, preserves existing `.env.local` values, generates a
+session secret if needed, starts PostgreSQL, and pushes the schema. Docker or
+OrbStack must be running. The database persists in the local `shell-postgres`
+Docker volume.
+
+`setup:local` writes these environment names to `.env.local`; values are
+secrets or private connection details and must not be committed:
 
 | Name             | Purpose                                                   |
 | ---------------- | --------------------------------------------------------- |
@@ -23,6 +27,10 @@ connection details and must not be committed:
 
 Integration tests use a separate `TEST_DATABASE_URL` only. Point it at a
 disposable local database; do not copy a production URL or rely on `.env.local`.
+
+Use `npm run setup:local -- --skip-database` when dependencies and environment
+setup are needed but PostgreSQL will be supplied separately. Use
+`--skip-dependencies` to avoid running `npm ci` again.
 
 ## Database operator flow
 

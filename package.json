@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "setup:local": "node scripts/setup-local.mjs",
     "db:push": "drizzle-kit push",
     "db:push:test": "sh -c 'test -n \"$TEST_DATABASE_URL\" || { echo \"TEST_DATABASE_URL is required\" >&2; exit 1; }; DATABASE_URL=\"$TEST_DATABASE_URL\" drizzle-kit push'",
     "format": "prettier --write .",
