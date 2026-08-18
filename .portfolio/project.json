@@ -1,0 +1,39 @@
+{
+  "slug": "shell",
+  "name": "cekrause/shell",
+  "description": "A terminal-style AI chat built with the OpenAI Responses API.",
+  "repositoryUrl": "https://github.com/cekrauseee/shell",
+  "metaDescription": "Shell is a terminal-style AI chat interface built with Next.js and the OpenAI Responses API.",
+  "summary": "Shell is a terminal-style AI chat built around one focused conversation. It combines keyboard-first controls with readable Markdown responses and a minimal full-screen interface.",
+  "highlights": [
+    "AI chat",
+    "Terminal UI",
+    "Next.js",
+    "OpenAI API",
+    "Markdown",
+    "Accessibility"
+  ],
+  "sections": [
+    {
+      "title": "Product",
+      "paragraphs": [
+        "Visitors write multiline prompts, move through earlier prompts with the arrow keys, and clear the conversation with a familiar keyboard shortcut. The assistant replies in the language of the latest message.",
+        "The interface uses the directness of a terminal without pretending to be a command line. The conversation remains the only primary surface."
+      ]
+    },
+    {
+      "title": "What I built",
+      "paragraphs": [
+        "I built the full-screen chat interface with a custom block cursor, prompt history, pending and error states, and accessible status announcements.",
+        "Responses render safe GitHub Flavored Markdown and reveal word by word. The animation is disabled when the visitor prefers reduced motion."
+      ]
+    },
+    {
+      "title": "Engineering choices",
+      "paragraphs": [
+        "A Next.js Server Action validates the conversation before calling the OpenAI Responses API. The API key stays on the server, and requests disable OpenAI response storage.",
+        "Messages remain in browser memory and disappear after a reload or clear action. The project does not yet include accounts, persistent history, rate limits, or the controls required for a public production service."
+      ]
+    }
+  ]
+}
