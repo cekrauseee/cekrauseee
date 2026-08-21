@@ -27,8 +27,10 @@ type BlockCursorInputProps = {
   disabled: boolean;
   invalid: boolean;
   errorMessageId?: string;
+  completionMenuId?: string;
   onChange: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onBlur: () => void;
 };
 
 function getCaretIndex(textarea: HTMLTextAreaElement) {
@@ -104,8 +106,10 @@ export function BlockCursorInput({
   disabled,
   invalid,
   errorMessageId,
+  completionMenuId,
   onChange,
   onKeyDown,
+  onBlur,
 }: BlockCursorInputProps) {
   const [caretIndex, setCaretIndex] = useState(value.length);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
@@ -148,13 +152,14 @@ export function BlockCursorInput({
         name="message"
         value={value}
         rows={1}
-        wrap="soft"
+        wrap="off"
         autoComplete="off"
         spellCheck="true"
         disabled={disabled}
         aria-invalid={invalid || undefined}
         aria-errormessage={errorMessageId}
-        aria-keyshortcuts="ArrowUp ArrowDown Shift+PageUp Shift+PageDown Control+L Meta+L"
+        aria-controls={completionMenuId}
+        aria-keyshortcuts="Enter Control+C Tab Shift+Tab Escape ArrowUp ArrowDown Shift+PageUp Shift+PageDown Control+L Meta+L"
         onChange={(event) => {
           onChange(event.currentTarget.value);
           setCaretIndex(getCaretIndex(event.currentTarget));
@@ -165,6 +170,7 @@ export function BlockCursorInput({
           setCaretIndex(getCaretIndex(event.currentTarget));
         }}
         onKeyDown={onKeyDown}
+        onBlur={onBlur}
         onScroll={(event) => {
           setScroll({
             left: event.currentTarget.scrollLeft,

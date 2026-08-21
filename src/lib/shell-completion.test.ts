@@ -1,0 +1,81 @@
+import { getCommandNames } from "just-bash/browser";
+import { describe, expect, it } from "vitest";
+
+import { getShellCompletion } from "@/lib/shell-completion";
+
+const nodes = [
+  { path: "/workspace", kind: "directory" as const },
+  { path: "/workspace/readme.md", kind: "file" as const },
+  { path: "/workspace/report.md", kind: "file" as const },
+  { path: "/workspace/projects", kind: "directory" as const },
+  { path: "/workspace/projects/release-notes.md", kind: "file" as const },
+];
+
+describe("getShellCompletion", () => {
+  it("completes commands from the shell command set", () => {
+    const completion = getShellCompletion("mk", 2, "/workspace", nodes);
+
+    expect(completion).toMatchObject({ start: 0, end: 2 });
+    expect(completion.candidates).toContain("mkdir");
+  });
+
+  it("does not advertise unavailable job-control commands", () => {
+    expect(
+      getShellCompletion("jo", 2, "/workspace", nodes).candidates,
+    ).not.toContain("jobs");
+    expect(
+      getShellCompletion("wa", 2, "/workspace", nodes).candidates,
+    ).not.toContain("wait");
+  });
+
+  it("advertises every browser executable except unavailable utilities", () => {
+    const unavailable = ["tar", "yq", "xan", "sqlite3"];
+    const candidates = getShellCompletion(
+      "",
+      0,
+      "/workspace",
+      nodes,
+    ).candidates;
+
+    for (const name of getCommandNames()) {
+      if (unavailable.includes(name)) {
+        expect(candidates).not.toContain(name);
+      } else {
+        expect(candidates).toContain(name);
+      }
+    }
+
+    for (const name of unavailable) {
+      expect(candidates).not.toContain(name);
+    }
+  });
+
+  it("advertises the synchronous fc builtin", () => {
+    expect(
+      getShellCompletion("f", 1, "/workspace", nodes).candidates,
+    ).toContain("fc");
+  });
+
+  it("returns files and directories from the current workspace path", () => {
+    expect(getShellCompletion("cat re", 6, "/workspace", nodes)).toEqual({
+      start: 4,
+      end: 6,
+      candidates: ["readme.md", "report.md"],
+    });
+    expect(
+      getShellCompletion("cat projects/r", 14, "/workspace", nodes),
+    ).toEqual({
+      start: 4,
+      end: 14,
+      candidates: ["projects/release-notes.md"],
+    });
+  });
+
+  it("does not expose paths outside the workspace", () => {
+    expect(getShellCompletion("cat ../", 7, "/workspace", nodes)).toEqual({
+      start: 4,
+      end: 7,
+      candidates: [],
+    });
+  });
+});

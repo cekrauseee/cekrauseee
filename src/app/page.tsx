@@ -1,5 +1,5 @@
-import { ChatShell } from "../features/chat/components/chat-shell";
+import { ShellTerminal } from "@/features/shell/components/shell-terminal";
 
 export default function Home() {
-  return <ChatShell />;
+  return <ShellTerminal />;
 }

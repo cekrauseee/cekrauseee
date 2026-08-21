@@ -2,25 +2,39 @@
 
 ## Purpose
 
-shell is a terminal-inspired interactive AI chat shell. The current model is a generic assistant that replies helpfully in the language of the visitor's latest message.
+shell is a terminal-inspired virtual shell. Its original neutral interface is
+preserved while its prompt executes commands in a persistent virtual workspace.
 
-## Scope
+## Current capabilities
 
-The application currently contains one App Router page and one full-screen chat experience. It uses a neutral monochrome palette that follows the system light or dark preference. The empty state shows only the `$` prompt and a custom block cursor; there is no visible onboarding copy or input placeholder.
+The active UI supports multiline commands, persisted prompt history, `clear`
+and Control/Command+L to clear the persisted transcript, and accessible
+pending/error announcements. Commands run with `just-bash` against an isolated
+filesystem and are persisted with the current working directory and transcript.
 
-The interface supports multiline prompts, prompt history with the up and down arrow keys, submission with Enter, new lines with Shift+Enter, conversation clearing with Control/Command+L, pending and error states, and accessible status announcements. Clicking outside the textarea focuses the active prompt and moves the caret to its end.
+The persistent engine also stores synchronous interpreter state, including
+variables, functions, options, bounded command history, `umask`, virtual
+`ulimit` values, and descriptor alias groups with shared offsets. These
+features are provided by the immutable `session-state-v3` fork release.
 
-It does not provide accounts, authentication, rate limits, a database, durable conversation history, analytics, or deployment infrastructure.
+## Intentionally unavailable
 
-## Runtime Behavior
+There is no host filesystem access, arbitrary network access, Python or
+JavaScript execution, account/profile UI, billing, rate limiting, or usage
+quotas. Unit CI remains database-free; a separate integration job uses only a
+disposable `TEST_DATABASE_URL`.
 
-The browser holds the active messages and prompt history in React state. Each submission sends the complete active conversation to a Next.js Server Action. The action validates the messages and requests a non-streaming response from `gpt-5.6-luna`. Responses render as safe GitHub Flavored Markdown with a word-reveal animation; reduced-motion preferences disable the reveal.
+The fork provides synchronous `fc`, `umask`, and virtual `ulimit`; the app
+excludes only `fc`'s interactive editor workflow. Background execution,
+`jobs`, `wait`, `kill`, signals, process substitutions, and all asynchronous
+execution are intentionally outside the app's virtual shell contract.
 
-## Boundaries
+The browser bundle reports four utilities that are not executable in this app:
+`tar`, `yq`, `xan`, and `sqlite3`. They are excluded from command completion and
+are outside the app command contract.
 
-- Reloading or clearing the page loses the browser-held conversation.
-- The application has no persistence layer.
-- OpenAI requests set `store: false`; the application itself does not save request or response content.
-- The OpenAI API key remains server-side and must be supplied as `OPENAI_API_KEY`.
-- Application-specific knowledge is not implemented yet; do not present generic model answers as facts about shell.
-- The current shell is a development chat experience, not a production-ready public service.
+## User and data boundaries
+
+The browser displays the active transcript. Anonymous signed sessions,
+validated workspace nodes, bounded command transcripts, and revisioned state
+remain on the server and are loaded whenever the interface initializes.

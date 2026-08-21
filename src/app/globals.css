@@ -116,7 +116,7 @@ textarea {
 
 .prompt-line {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: first baseline;
   min-width: 0;
   column-gap: 0.65rem;
@@ -289,6 +289,7 @@ textarea {
   max-height: 12rem;
   margin: 0;
   padding: 0;
+  overflow-x: auto;
   overflow-y: hidden;
   resize: none;
   border: 0;
@@ -298,8 +299,14 @@ textarea {
   color: var(--text);
   caret-color: transparent;
   line-height: inherit;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
+  overflow-wrap: normal;
+  white-space: pre;
+  scrollbar-width: none;
+}
+
+.composer__textarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .block-input__mirror {
@@ -309,8 +316,8 @@ textarea {
   inset-inline-start: 0;
   width: 100%;
   min-height: 1.6em;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
+  overflow-wrap: normal;
+  white-space: pre;
   color: transparent;
   line-height: inherit;
   pointer-events: none;
@@ -352,49 +359,29 @@ textarea {
   opacity: 0.55;
 }
 
-.pending {
-  display: flex;
-  align-items: center;
-  min-height: 1.6em;
-  margin: 0;
-  color: var(--text-muted);
-  font-size: inherit;
-  line-height: inherit;
-}
-
-.pending__shimmer {
-  display: inline-flex;
-}
-
-.pending__shimmer-character {
-  color: var(--text-muted);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .pending__shimmer-character {
-    animation: terminal-shimmer 1120ms steps(1, end) infinite;
-  }
-}
-
-@keyframes terminal-shimmer {
-  0%,
-  16%,
-  34%,
-  100% {
-    color: var(--text-muted);
-  }
-
-  17%,
-  33% {
-    color: var(--text);
-  }
-}
-
 .error {
   max-width: 65ch;
   margin: 0.65rem 0 0;
   color: var(--error);
   overflow-wrap: anywhere;
+}
+
+.completion-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  max-width: 72ch;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+}
+
+.completion-menu__candidate[data-selected] {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.15em;
 }
 
 @media (prefers-reduced-motion: reduce) {
