@@ -1,39 +1,115 @@
 {
   "slug": "shell",
   "name": "cekrause/shell",
-  "description": "A terminal-style AI chat built with the OpenAI Responses API.",
   "repositoryUrl": "https://github.com/cekrauseee/shell",
-  "metaDescription": "Shell is a terminal-style AI chat interface built with Next.js and the OpenAI Responses API.",
-  "summary": "Shell is a terminal-style AI chat built around one focused conversation. It combines keyboard-first controls with readable Markdown responses and a minimal full-screen interface.",
-  "highlights": [
-    "AI chat",
-    "Terminal UI",
-    "Next.js",
-    "OpenAI API",
-    "Markdown",
-    "Accessibility"
-  ],
-  "sections": [
-    {
-      "title": "Product",
-      "paragraphs": [
-        "Visitors write multiline prompts, move through earlier prompts with the arrow keys, and clear the conversation with a familiar keyboard shortcut. The assistant replies in the language of the latest message.",
-        "The interface uses the directness of a terminal without pretending to be a command line. The conversation remains the only primary surface."
+  "translations": {
+    "en": {
+      "description": "A terminal-style AI chat built with the OpenAI Responses API.",
+      "metaDescription": "Shell is a terminal-style AI chat interface built with Next.js and the OpenAI Responses API.",
+      "summary": "Shell is a terminal-style AI chat built around one focused conversation. It combines keyboard-first controls with readable Markdown responses and a minimal full-screen interface.",
+      "highlights": [
+        "AI chat",
+        "Terminal UI",
+        "Next.js",
+        "OpenAI API",
+        "Markdown",
+        "Accessibility"
+      ],
+      "sections": [
+        {
+          "title": "Product",
+          "paragraphs": [
+            "Visitors write multiline prompts, move through earlier prompts with the arrow keys, and clear the conversation with a familiar keyboard shortcut. The assistant replies in the language of the latest message.",
+            "The interface uses the directness of a terminal without pretending to be a command line. The conversation remains the only primary surface."
+          ]
+        },
+        {
+          "title": "What I built",
+          "paragraphs": [
+            "I built the full-screen chat interface with a custom block cursor, prompt history, pending and error states, and accessible status announcements.",
+            "Responses render safe GitHub Flavored Markdown and reveal word by word. The animation is disabled when the visitor prefers reduced motion."
+          ]
+        },
+        {
+          "title": "Engineering choices",
+          "paragraphs": [
+            "A Next.js Server Action validates the conversation before calling the OpenAI Responses API. The API key stays on the server, and requests disable OpenAI response storage.",
+            "Messages remain in browser memory and disappear after a reload or clear action. The project does not yet include accounts, persistent history, rate limits, or the controls required for a public production service."
+          ]
+        }
       ]
     },
-    {
-      "title": "What I built",
-      "paragraphs": [
-        "I built the full-screen chat interface with a custom block cursor, prompt history, pending and error states, and accessible status announcements.",
-        "Responses render safe GitHub Flavored Markdown and reveal word by word. The animation is disabled when the visitor prefers reduced motion."
+    "pt": {
+      "description": "Um chat com IA em estilo terminal, construído com a API Responses da OpenAI.",
+      "metaDescription": "Shell é uma interface de chat com IA em estilo terminal, construída com Next.js e a API Responses da OpenAI.",
+      "summary": "Shell é um chat com IA em estilo terminal centrado em uma única conversa. Ele combina controles orientados ao teclado, respostas legíveis em Markdown e uma interface mínima em tela cheia.",
+      "highlights": [
+        "Chat com IA",
+        "Interface de terminal",
+        "Next.js",
+        "API da OpenAI",
+        "Markdown",
+        "Acessibilidade"
+      ],
+      "sections": [
+        {
+          "title": "Produto",
+          "paragraphs": [
+            "Visitantes escrevem prompts com várias linhas, percorrem prompts anteriores com as setas e limpam a conversa com um atalho de teclado conhecido. O assistente responde no idioma da mensagem mais recente.",
+            "A interface usa a objetividade de um terminal sem fingir ser uma linha de comando. A conversa continua sendo a única superfície principal."
+          ]
+        },
+        {
+          "title": "O que construí",
+          "paragraphs": [
+            "Construí a interface de chat em tela cheia com um cursor de bloco personalizado, histórico de prompts, estados de espera e erro e anúncios de status acessíveis.",
+            "As respostas renderizam GitHub Flavored Markdown com segurança e aparecem palavra por palavra. A animação é desativada quando o visitante prefere movimento reduzido."
+          ]
+        },
+        {
+          "title": "Decisões de engenharia",
+          "paragraphs": [
+            "Uma Server Action do Next.js valida a conversa antes de chamar a API Responses da OpenAI. A chave da API permanece no servidor, e as solicitações desativam o armazenamento de respostas pela OpenAI.",
+            "As mensagens permanecem na memória do navegador e desaparecem após recarregar a página ou limpar a conversa. O projeto ainda não inclui contas, histórico persistente, limites de uso ou os controles necessários para um serviço público em produção."
+          ]
+        }
       ]
     },
-    {
-      "title": "Engineering choices",
-      "paragraphs": [
-        "A Next.js Server Action validates the conversation before calling the OpenAI Responses API. The API key stays on the server, and requests disable OpenAI response storage.",
-        "Messages remain in browser memory and disappear after a reload or clear action. The project does not yet include accounts, persistent history, rate limits, or the controls required for a public production service."
+    "ja": {
+      "description": "OpenAI Responses APIで構築したターミナル風のAIチャットです。",
+      "metaDescription": "ShellはNext.jsとOpenAI Responses APIで構築したターミナル風のAIチャットインターフェースです。",
+      "summary": "Shellは1つの会話に集中できるターミナル風のAIチャットです。キーボード中心の操作、読みやすいMarkdown回答、最小限の全画面インターフェースを組み合わせています。",
+      "highlights": [
+        "AIチャット",
+        "ターミナルUI",
+        "Next.js",
+        "OpenAI API",
+        "Markdown",
+        "アクセシビリティ"
+      ],
+      "sections": [
+        {
+          "title": "プロダクト",
+          "paragraphs": [
+            "複数行のプロンプトを入力し、矢印キーで過去のプロンプトをたどり、使い慣れたキーボードショートカットで会話を消去できます。アシスタントは最新メッセージの言語で応答します。",
+            "コマンドラインを装うことなく、ターミナルの直接的な操作感を取り入れています。会話だけが主要な操作領域です。"
+          ]
+        },
+        {
+          "title": "構築したもの",
+          "paragraphs": [
+            "独自のブロックカーソル、プロンプト履歴、処理中とエラーの状態、アクセシブルなステータス通知を備えた全画面チャットを構築しました。",
+            "回答は安全なGitHub Flavored Markdownとして表示され、単語ごとに現れます。利用者が視差効果を減らす設定を選んでいる場合、アニメーションは無効になります。"
+          ]
+        },
+        {
+          "title": "設計上の選択",
+          "paragraphs": [
+            "Next.jsのServer Actionが会話を検証してからOpenAI Responses APIを呼び出します。APIキーはサーバーに保持され、リクエストではOpenAIによる回答保存を無効にしています。",
+            "メッセージはブラウザのメモリだけに保持され、再読み込みまたは消去操作で失われます。現時点では、アカウント、永続的な履歴、レート制限、公開本番サービスに必要な制御は含まれていません。"
+          ]
+        }
       ]
     }
-  ]
+  }
 }
